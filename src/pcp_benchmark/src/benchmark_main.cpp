@@ -41,7 +41,6 @@ struct BenchParams
   std::string pipeline = "ompl";
   std::string group = "ur_manipulator";
   std::string tip_link = "tool0";
-  std::string mode = "constrained_state_space";
   std::string trajectory_dir;  ///< if set, every successful trajectory is saved there as JSON
   std::vector<std::string> planners = {"RRTConnectkConfigDefault"};
   std::vector<std::string> constraints = {"none", "orientation"};
@@ -52,7 +51,7 @@ struct BenchParams
   int64_t first_query = 0;
   int64_t max_queries = -1;
   int64_t repetitions = 1;
-  int64_t ompl_seed = 0;
+  int64_t ompl_seed = 1;
 };
 
 BenchParams loadParams(const rclcpp::Node::SharedPtr & node)
@@ -64,7 +63,6 @@ BenchParams loadParams(const rclcpp::Node::SharedPtr & node)
   node->get_parameter("bench.pipeline", p.pipeline);
   node->get_parameter("bench.group", p.group);
   node->get_parameter("bench.tip_link", p.tip_link);
-  node->get_parameter("bench.mode", p.mode);
   node->get_parameter("bench.trajectory_dir", p.trajectory_dir);
   node->get_parameter("bench.planners", p.planners);
   node->get_parameter("bench.constraints", p.constraints);
@@ -184,10 +182,23 @@ int main(int argc, char ** argv)
     voxels = occupiedVoxels(*snapshot);
     RCLCPP_INFO(kLog, "frozen planning scene: octomap with %zu occupied voxels", voxels);
 
+    // The mode column is derived from the pipeline configuration actually loaded, not a label.
+    bool enforce_css = false;
+    node->get_parameter(
+      p.pipeline + "." + p.group + ".enforce_constrained_state_space", enforce_css);
+    std::string css_value;
+    if (
+      !enforce_css &&
+      node->get_parameter(
+        p.pipeline + "." + p.group + ".enforce_constrained_state_space", css_value)) {
+      enforce_css = css_value == "true";
+    }
+
     std::ofstream csv(p.output_csv);
     csv << "commit,query_seed,ompl_seed,query_id,start_region,goal_region,planner,constraint,mode,"
            "rep,success,error_code,planning_time_s,wall_time_s,joint_path_rad,tcp_path_m,"
-           "max_tilt_deg,n_waypoints,start_valid,goal_valid,octomap_voxels\n";
+           "max_tilt_deg,n_waypoints,dense_collision_free,target_yaw_deg,start_valid,goal_valid,"
+           "octomap_voxels\n";
 
     moveit_cpp::PlanningComponent planning(p.group, moveit);
     pcp_benchmark::ConstraintSpec spec;
@@ -213,9 +224,15 @@ int main(int argc, char ** argv)
       goal.update();
       const bool start_valid = !snapshot->isStateColliding(start, p.group);
       const bool goal_valid = !snapshot->isStateColliding(goal, p.group);
+      // Reference yaw for the keep-upright constraint: halfway between start and goal yaw, so the
+      // rotation-vector yaw/tilt coupling is at most a factor 1.11 at either end.
+      spec.target_yaw = pcp_benchmark::circularMean(q.start_tcp[3], q.goal_tcp[3]);
 
       for (const auto & constraint_name : p.constraints) {
         const auto type = pcp_benchmark::constraintTypeFromString(constraint_name);
+        const std::string mode = type == pcp_benchmark::ConstraintType::kNone ? "joint_space"
+                                 : enforce_css ? "constrained_state_space"
+                                               : "rejection_sampling";
         for (const auto & planner : p.planners) {
           for (int64_t rep = 0; rep < p.repetitions; ++rep) {
             planning.setStartState(start);
@@ -236,6 +253,7 @@ int main(int argc, char ** argv)
 
             const bool success = static_cast<bool>(response.error_code) && response.trajectory;
             pcp_benchmark::PathMetrics metrics;
+            bool dense_collision_free = true;
             if (success) {
               pcp_benchmark::JointPath path;
               for (std::size_t w = 0; w < response.trajectory->getWayPointCount(); ++w) {
@@ -245,6 +263,17 @@ int main(int argc, char ** argv)
               }
               metrics = pcp_benchmark::computePathMetrics(model, p.group, p.tip_link, path);
               ++successes;
+              // ValidateSolution checks only the waypoints; check the executed trajectory (linear
+              // joint interpolation between waypoints) at 0.01 rad steps against the snapshot.
+              moveit::core::RobotState dense_state(start);
+              for (const auto & qd : pcp_benchmark::densify(path, 0.01)) {
+                dense_state.setJointGroupPositions(jmg, qd);
+                dense_state.update();
+                if (snapshot->isStateColliding(dense_state, p.group)) {
+                  dense_collision_free = false;
+                  break;
+                }
+              }
               if (!p.trajectory_dir.empty()) {
                 nlohmann::json points = nlohmann::json::array();
                 for (std::size_t w = 0; w < path.size(); ++w) {
@@ -261,20 +290,29 @@ int main(int argc, char ** argv)
                   {"points", points},
                 };
                 std::ofstream(
-                  p.trajectory_dir + "/q" + std::to_string(q.id) + "_" + constraint_name + ".json")
+                  p.trajectory_dir + "/q" + std::to_string(q.id) + "_" + constraint_name + "_" +
+                  planner + ".json")
                   << traj.dump(1) << "\n";
               }
             }
             ++cells;
             csv << p.commit << ',' << query_set.config.seed << ',' << p.ompl_seed << ',' << q.id
                 << ',' << q.start_region << ',' << q.goal_region << ',' << planner << ','
-                << constraint_name << ',' << p.mode << ',' << rep << ',' << (success ? 1 : 0) << ','
-                << response.error_code.val << ',' << fixedStr(response.planning_time) << ','
-                << fixedStr(wall) << ',' << (success ? fixedStr(metrics.joint_path_rad) : "") << ','
+                << constraint_name << ',' << mode << ',' << rep << ',' << (success ? 1 : 0)
+                << ','
+                // MoveIt leaves planning_time at 0 on failure: leave the cell empty instead.
+                << response.error_code.val << ','
+                << (success ? fixedStr(response.planning_time) : "") << ',' << fixedStr(wall) << ','
+                << (success ? fixedStr(metrics.joint_path_rad) : "") << ','
                 << (success ? fixedStr(metrics.tcp_path_m) : "") << ','
                 << (success ? fixedStr(metrics.max_tilt_deg, 3) : "") << ','
                 << (success ? std::to_string(metrics.n_waypoints) : "") << ','
-                << (start_valid ? 1 : 0) << ',' << (goal_valid ? 1 : 0) << ',' << voxels << '\n';
+                << (success ? (dense_collision_free ? "1" : "0") : "") << ','
+                << (type == pcp_benchmark::ConstraintType::kNone
+                      ? ""
+                      : fixedStr(spec.target_yaw * 180.0 / M_PI, 2))
+                << ',' << (start_valid ? 1 : 0) << ',' << (goal_valid ? 1 : 0) << ',' << voxels
+                << '\n';
             csv.flush();
             RCLCPP_INFO(
               kLog, "query %zu %s %s rep %ld: %s in %.3f s", q.id, constraint_name.c_str(),
@@ -296,7 +334,7 @@ int main(int argc, char ** argv)
       {"ompl_seed", p.ompl_seed},
       {"planners", p.planners},
       {"constraints", p.constraints},
-      {"mode", p.mode},
+      {"enforce_constrained_state_space", enforce_css},
       {"planning_time_s", p.planning_time},
       {"repetitions", p.repetitions},
       {"first_query", first},

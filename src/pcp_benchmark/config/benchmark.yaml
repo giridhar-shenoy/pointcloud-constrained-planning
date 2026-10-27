@@ -8,13 +8,12 @@
       pipeline: ompl
       group: ur_manipulator
       tip_link: tool0
-      mode: constrained_state_space
       planners: [RRTConnectkConfigDefault]
       constraints: [none, orientation]
       planning_time: 10.0       # s, per cell
       max_tilt_deg: 5.0         # keep-upright cone half-angle
       repetitions: 1
-      ompl_seed: 0
+      ompl_seed: 1             # OMPL replaces seed 0 by 1 (with a warning), so start at 1
       octomap_timeout: 180.0    # s to wait for move_group's octomap
       octomap_settle: 3.0       # s the occupied-voxel count must stay unchanged
     planning_pipelines:
