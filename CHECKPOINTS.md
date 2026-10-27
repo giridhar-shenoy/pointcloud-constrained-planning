@@ -46,7 +46,7 @@ scripts/regenerate_all.sh
 $ git log --format="%h %ad %s" --date=iso
 e47c849 2026-10-28 03:44:15 +0530 chore: add repository skeleton for pointcloud-constrained-planning
 $ gh run list --limit 1
-completed	failure	chore: add repository skeleton for pointcloud-constrained-planning	CI	main	push	40593288166	4s	2026-10-27T22:14:37Z
+completed   failure chore: add repository skeleton for pointcloud-constrained-planning  CI  main    push    40593288166 4s  2026-10-27T22:14:37Z
 $ git status --short
 ?? MORNING.md
 ```
