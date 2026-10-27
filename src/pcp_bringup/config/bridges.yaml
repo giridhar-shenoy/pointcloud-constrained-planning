@@ -1,0 +1,6 @@
+# ros_gz_bridge: Gazebo rgbd_camera -> ROS. /clock is bridged by ur_sim_control.launch.py.
+- ros_topic_name: /camera/points
+  gz_topic_name: /camera/points
+  ros_type_name: sensor_msgs/msg/PointCloud2
+  gz_type_name: gz.msgs.PointCloudPacked
+  direction: GZ_TO_ROS
