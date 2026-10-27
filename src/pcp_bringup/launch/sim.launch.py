@@ -57,7 +57,10 @@ def generate_launch_description():
                 [FindPackageShare("pcp_moveit_config"), "launch", "move_group.launch.py"]
             )
         ),
-        launch_arguments={"use_sim_time": "true"}.items(),
+        launch_arguments={
+            "use_sim_time": "true",
+            "octomap_resolution": LaunchConfiguration("octomap_resolution"),
+        }.items(),
     )
 
     return LaunchDescription(
@@ -67,6 +70,11 @@ def generate_launch_description():
                 default_value=PathJoinSubstitution(
                     [FindPackageShare("pcp_bringup"), "worlds", "shelf.sdf"]
                 ),
+            ),
+            DeclareLaunchArgument(
+                "octomap_resolution",
+                default_value="0.02",
+                description="Octomap voxel edge (m); 0.02 is the documented default.",
             ),
             DeclareLaunchArgument(
                 "move_group_delay",

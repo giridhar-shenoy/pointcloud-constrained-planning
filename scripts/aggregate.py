@@ -314,6 +314,21 @@ EXTRA_SECTIONS = [
         "results/tuning/queries_seed1.json results/tuning/tuning.yaml`",
     ),
     (
+        "results/sweep/octomap_0.02.csv",
+        "Octomap resolution sweep: 2 cm (first 20 evaluation queries)",
+        "SHOULD item. The first 20 seed-0 queries with the benchmark planner, octomap voxels of "
+        "2 cm (the default) in a fresh simulation; compare with the 5 cm section below.",
+        "`scripts/bench_octomap_resolution.sh 20 0.02 0.05`",
+    ),
+    (
+        "results/sweep/octomap_0.05.csv",
+        "Octomap resolution sweep: 5 cm (first 20 evaluation queries)",
+        "Same 20 queries, octomap voxels of 5 cm. Coarser voxels inflate obstacles by up to a "
+        "voxel, which eats the generator's 3 cm clearance; `start_valid`/`goal_valid` in the CSV "
+        "show how many queries become invalid.",
+        "`scripts/bench_octomap_resolution.sh 20 0.02 0.05`",
+    ),
+    (
         "results/ablation/bench_lvsf0.005.csv",
         "Ablation: collision-check resolution 0.005 (MoveIt's usual value)",
         "The same 100 evaluation queries with `longest_valid_segment_fraction: 0.005` and OMPL's "
