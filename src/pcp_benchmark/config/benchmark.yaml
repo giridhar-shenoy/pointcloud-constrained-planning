@@ -8,7 +8,9 @@
       pipeline: ompl
       group: ur_manipulator
       tip_link: tool0
-      planners: [RRTConnectkConfigDefault]
+      # RRTConnectRange2 was chosen on the seed-1 tuning set (results/tuning/tuning.csv), never on
+      # the seed-0 evaluation queries; see docs/planners.md "How range was chosen".
+      planners: [RRTConnectRange2]
       constraints: [none, orientation]
       planning_time: 10.0       # s, per cell
       max_tilt_deg: 5.0         # keep-upright cone half-angle
