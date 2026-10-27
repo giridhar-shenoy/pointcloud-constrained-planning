@@ -1,0 +1,6 @@
+# Range selection on the tuning set (seed 1): orientation constraint only, every RRTConnect range.
+/**:
+  ros__parameters:
+    bench:
+      planners: [RRTConnectkConfigDefault, RRTConnectRange0_5, RRTConnectRange1, RRTConnectRange2]
+      constraints: [orientation]
