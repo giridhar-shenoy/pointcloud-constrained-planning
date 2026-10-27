@@ -1,0 +1,22 @@
+# Shelf scene: the single source of truth for the shelf geometry.
+# - scripts/make_world.py writes the Gazebo world (pcp_bringup/worlds/shelf.sdf) from it.
+# - pcp_benchmark's query generator reads it to collision-check sampled start/goal states.
+# All boxes are axis-aligned, in the `world` frame; position = box centre, size = full extents (m).
+# The UR5e base is at the world origin facing +x; the shelf front face is at x = 0.40.
+frame: world
+boxes:
+  - {name: board_bottom, size: [0.40, 1.24, 0.02], position: [0.60, 0.0, 0.09]}
+  - {name: board_middle, size: [0.40, 1.24, 0.02], position: [0.60, 0.0, 0.49]}
+  - {name: board_top, size: [0.40, 1.24, 0.02], position: [0.60, 0.0, 0.89]}
+  - {name: wall_left, size: [0.40, 0.02, 0.90], position: [0.60, 0.61, 0.45]}
+  - {name: wall_right, size: [0.40, 0.02, 0.90], position: [0.60, -0.61, 0.45]}
+  - {name: wall_back, size: [0.02, 1.24, 0.90], position: [0.81, 0.0, 0.45]}
+  - {name: divider, size: [0.40, 0.02, 0.78], position: [0.60, 0.0, 0.49]}
+# Regions where the query generator samples tool0 positions (tool pointing down, free yaw).
+# Each compartment is bounded by boards, walls and the central divider, so moving between
+# compartments forces the arm out of the shelf and around the divider or a board.
+target_regions:
+  - {name: lower_left, min: [0.46, 0.12, 0.18], max: [0.72, 0.48, 0.26]}
+  - {name: lower_right, min: [0.46, -0.48, 0.18], max: [0.72, -0.12, 0.26]}
+  - {name: upper_left, min: [0.44, 0.12, 0.58], max: [0.62, 0.40, 0.64]}
+  - {name: upper_right, min: [0.44, -0.40, 0.58], max: [0.62, -0.12, 0.64]}
