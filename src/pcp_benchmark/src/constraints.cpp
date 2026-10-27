@@ -4,6 +4,7 @@
 #include <cmath>
 #include <stdexcept>
 
+#include <Eigen/Geometry>
 #include <moveit_msgs/msg/orientation_constraint.hpp>
 
 namespace pcp_benchmark
@@ -31,6 +32,11 @@ std::string toString(ConstraintType type)
   return "unknown";
 }
 
+double circularMean(double a, double b)
+{
+  return std::atan2(std::sin(a) + std::sin(b), std::cos(a) + std::cos(b));
+}
+
 double perAxisToleranceRad(double max_tilt_deg)
 {
   return max_tilt_deg * M_PI / 180.0 / std::sqrt(2.0);
@@ -46,12 +52,15 @@ moveit_msgs::msg::Constraints buildPathConstraints(ConstraintType type, const Co
   moveit_msgs::msg::OrientationConstraint oc;
   oc.header.frame_id = spec.frame_id;
   oc.link_name = spec.link_name;
-  // Tool z along world -z, yaw 0: a 180 deg rotation about world x, quaternion (x, y, z, w) =
-  // (1, 0, 0, 0).
-  oc.orientation.x = 1.0;
-  oc.orientation.y = 0.0;
-  oc.orientation.z = 0.0;
-  oc.orientation.w = 0.0;
+  // Tool z along world -z with the given yaw: Rz(yaw) * Rx(pi). For yaw 0 the quaternion
+  // (x, y, z, w) is (1, 0, 0, 0).
+  const Eigen::Quaterniond q(
+    Eigen::AngleAxisd(spec.target_yaw, Eigen::Vector3d::UnitZ()) *
+    Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX()));
+  oc.orientation.x = q.x();
+  oc.orientation.y = q.y();
+  oc.orientation.z = q.z();
+  oc.orientation.w = q.w();
   const double tol = perAxisToleranceRad(spec.max_tilt_deg);
   oc.absolute_x_axis_tolerance = tol;
   oc.absolute_y_axis_tolerance = tol;

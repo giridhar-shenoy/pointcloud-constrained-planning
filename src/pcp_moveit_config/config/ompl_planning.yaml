@@ -8,13 +8,19 @@ request_adapters:
   - default_planning_request_adapters/ValidateWorkspaceBounds
   - default_planning_request_adapters/CheckStartStateBounds
   - default_planning_request_adapters/CheckStartStateCollision
-# ValidateSolution re-checks the returned path for collisions and path-constraint violations,
-# so "success" in bench.csv means the trajectory MoveIt hands back is valid, not just that OMPL
-# reported an exact solution.
+# ValidateSolution runs FIRST, on the planner's own waypoints (OMPL has already checked the motions
+# between them at longest_valid_segment_fraction resolution). Time parameterization runs after it
+# with corner blending limited to 0.01 rad (MoveIt's default 0.1 rad could cut a corner into a
+# 2 cm board after validation). The benchmark node additionally re-checks the executed trajectory
+# at 0.01 rad steps (dense_collision_free in bench.csv).
 response_adapters:
-  - default_planning_response_adapters/AddTimeOptimalParameterization
   - default_planning_response_adapters/ValidateSolution
+  - default_planning_response_adapters/AddTimeOptimalParameterization
   - default_planning_response_adapters/DisplayMotionPath
+totg:
+  path_tolerance: 0.01  # rad, max deviation of the blended trajectory from the planned path
+  resample_dt: 0.1      # s, MoveIt default
+  min_angle_change: 0.001
 
 planner_configs:
   # range 0 = OMPL picks 20 % of the state-space extent, i.e. 0.2 x 69.1 = 13.8 rad for the UR5e

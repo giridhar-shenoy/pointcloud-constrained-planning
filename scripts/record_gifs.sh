@@ -32,7 +32,8 @@ if [ "${QID}" -lt 0 ]; then
   echo "[record_gifs] no query solved under both constraint types in ${CSV}" >&2
   exit 1
 fi
-echo "[record_gifs] query ${QID}"
+PLANNER=$(python3 -c "import csv,sys; print(next(csv.DictReader(open(sys.argv[1])))['planner'])" "${CSV}")
+echo "[record_gifs] query ${QID}, planner ${PLANNER}"
 
 cat >"${WORK}/inner.sh" <<INNER
 #!/usr/bin/env bash
@@ -41,25 +42,25 @@ for attempt in 1 2 3; do
   ros2 launch pcp_benchmark benchmark.launch.py queries_file:=${REPO}/results/queries.json \
     output_csv:=${REPO}/${WORK}/replan.csv first_query:=${QID} max_queries:=1 \
     trajectory_dir:=${REPO}/${WORK}/traj commit:=gif
-  if [ -f ${REPO}/${WORK}/traj/q${QID}_none.json ] && [ -f ${REPO}/${WORK}/traj/q${QID}_orientation.json ]; then
+  if [ -f ${REPO}/${WORK}/traj/q${QID}_none_${PLANNER}.json ] && [ -f ${REPO}/${WORK}/traj/q${QID}_orientation_${PLANNER}.json ]; then
     break
   fi
   echo "[record_gifs] re-plan attempt \${attempt} did not solve both cells"
 done
 ros2 run pcp_bringup record_demo.py --out-dir ${REPO}/${WORK}/frames \
-  --traj ${REPO}/${WORK}/traj/q${QID}_none.json --traj ${REPO}/${WORK}/traj/q${QID}_orientation.json
+  --traj ${REPO}/${WORK}/traj/q${QID}_none_${PLANNER}.json --traj ${REPO}/${WORK}/traj/q${QID}_orientation_${PLANNER}.json
 INNER
 chmod +x "${WORK}/inner.sh"
 "${REPO}/scripts/with_sim.sh" "${WORK}/inner.sh"
 
 tilt() { python3 -c "import json,sys; print(f\"{json.load(open(sys.argv[1]))['max_tilt_deg']:.0f}\")" "$1"; }
-T_NONE=$(tilt "${WORK}/traj/q${QID}_none.json")
-T_ORI=$(tilt "${WORK}/traj/q${QID}_orientation.json")
+T_NONE=$(tilt "${WORK}/traj/q${QID}_none_${PLANNER}.json")
+T_ORI=$(tilt "${WORK}/traj/q${QID}_orientation_${PLANNER}.json")
 FONT=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
 LABEL="fontfile=${FONT}:fontsize=17:fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=6:x=10:y=10"
 ffmpeg -loglevel error -y \
-  -framerate 10 -i "${WORK}/frames/q${QID}_none/frame_%04d.png" \
-  -framerate 10 -i "${WORK}/frames/q${QID}_orientation/frame_%04d.png" \
+  -framerate 10 -i "${WORK}/frames/q${QID}_none_${PLANNER}/frame_%04d.png" \
+  -framerate 10 -i "${WORK}/frames/q${QID}_orientation_${PLANNER}/frame_%04d.png" \
   -filter_complex "[0:v]drawtext=${LABEL}:text='no constraint - max tool tilt ${T_NONE} deg'[a];\
 [1:v]drawtext=${LABEL}:text='keep upright (5 deg) - max tilt ${T_ORI} deg'[b];\
 [a][b]hstack=inputs=2,scale=800:-1:flags=lanczos,split[s0][s1];\

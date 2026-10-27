@@ -73,8 +73,8 @@ TEST(ConstraintBuilder, OrientationMessageFields)
   EXPECT_EQ(oc.header.frame_id, "world");
   EXPECT_EQ(oc.link_name, "tool0");
   EXPECT_EQ(oc.parameterization, moveit_msgs::msg::OrientationConstraint::ROTATION_VECTOR);
-  EXPECT_DOUBLE_EQ(oc.orientation.x, 1.0);
-  EXPECT_DOUBLE_EQ(oc.orientation.w, 0.0);
+  EXPECT_NEAR(oc.orientation.x, 1.0, 1e-12);
+  EXPECT_NEAR(oc.orientation.w, 0.0, 1e-12);
   EXPECT_NEAR(oc.absolute_x_axis_tolerance, 5.0 * kDeg / std::sqrt(2.0), 1e-12);
   EXPECT_NEAR(oc.absolute_y_axis_tolerance, 5.0 * kDeg / std::sqrt(2.0), 1e-12);
   EXPECT_DOUBLE_EQ(oc.absolute_z_axis_tolerance, M_PI);
@@ -111,6 +111,35 @@ TEST_F(ConstraintTest, SmallTiltAcceptedLargeTiltRejected)
   q[4] += 6.0 * kDeg;
   EXPECT_NEAR(tilt(q), 6.0, 1e-3);
   EXPECT_FALSE(satisfied(c, q));
+}
+
+// The rotation vector couples yaw and tilt: the same 3 deg tilt is accepted when the tool's yaw
+// matches the reference yaw and rejected when it is 180 deg away. This is why the runner centres
+// the reference yaw between start and goal.
+TEST_F(ConstraintTest, ToleranceDependsOnYawOffsetFromReference)
+{
+  auto q = kToolDown;
+  q[4] += 3.0 * kDeg;  // 3 deg tilt
+  EXPECT_NEAR(tilt(q), 3.0, 1e-3);
+  moveit::core::RobotState state(model_);
+  state.setToDefaultValues();
+  state.setJointGroupPositions(jmg_, q);
+  state.update();
+  const Eigen::Matrix3d r = state.getGlobalLinkTransform("tool0").linear();
+  // Rz(yaw) * Rx(pi) = [[c, s, 0], [s, -c, 0], [0, 0, -1]]: yaw from the tool x axis.
+  const double tool_yaw = std::atan2(r(1, 0), r(0, 0));
+  ConstraintSpec spec;
+  spec.target_yaw = tool_yaw;  // reference yaw = tool yaw: accepted
+  EXPECT_TRUE(satisfied(buildPathConstraints(ConstraintType::kOrientation, spec), q));
+  spec.target_yaw = tool_yaw + M_PI;  // same tilt, reference 180 deg away: rejected
+  EXPECT_FALSE(satisfied(buildPathConstraints(ConstraintType::kOrientation, spec), q));
+}
+
+TEST(ConstraintBuilder, CircularMean)
+{
+  EXPECT_NEAR(circularMean(0.2, 0.4), 0.3, 1e-12);
+  EXPECT_NEAR(std::abs(circularMean(3.0, -3.0)), M_PI, 1e-12);  // wraps through pi, not 0
+  EXPECT_NEAR(circularMean(-0.5, 0.5), 0.0, 1e-12);
 }
 
 // Soundness of the inscribed-square tolerance: whatever MoveIt accepts tilts at most 5 deg.

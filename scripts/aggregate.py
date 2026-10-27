@@ -98,6 +98,9 @@ def summarise(rows: list[dict]) -> list[dict]:
                 if ok
                 else math.nan,
                 "tilt_max_deg": max(float(r["max_tilt_deg"]) for r in ok) if ok else math.nan,
+                # Executed trajectory re-checked at 0.01 rad steps (column absent in old CSVs).
+                "dense_ok": sum(1 for r in ok if r.get("dense_collision_free") == "1"),
+                "dense_checked": sum(1 for r in ok if r.get("dense_collision_free", "") != ""),
                 "invalid_queries": sum(
                     1 for r in rs if r["start_valid"] != "1" or r["goal_valid"] != "1"
                 ),
@@ -141,8 +144,9 @@ def pct(x: float) -> str:
 def main_table(summary: list[dict]) -> str:
     lines = [
         "| Planner | Constraint | Success (95 % Wilson CI) | Planning time median / p95 (s) "
-        "| Joint path median (rad) | TCP path median (m) | Max tool tilt median / worst (deg) |",
-        "|---|---|---|---|---|---|---|",
+        "| Joint path median (rad) | TCP path median (m) | Max tool tilt median / worst (deg) "
+        "| Executed path collision-free (dense check) |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for s in summary:
         lines.append(
@@ -150,7 +154,9 @@ def main_table(summary: list[dict]) -> str:
             f"{pct(s['success_rate'])} ({pct(s['ci_lo'])}–{pct(s['ci_hi'])}) | "
             f"{f(s['time_median_s'], 3)} / {f(s['time_p95_s'], 3)} | "
             f"{f(s['joint_path_median_rad'])} | {f(s['tcp_path_median_m'])} | "
-            f"{f(s['tilt_median_deg'], 1)} / {f(s['tilt_max_deg'], 1)} |"
+            f"{f(s['tilt_median_deg'], 1)} / {f(s['tilt_max_deg'], 1)} | "
+            + (f"{s['dense_ok']}/{s['dense_checked']}" if s["dense_checked"] else "not recorded")
+            + " |"
         )
     return "\n".join(lines)
 
@@ -344,10 +350,11 @@ def main() -> int:
 
     commits = sorted({r["commit"] for r in rows})
     queries = sorted({int(r["query_id"]) for r in rows})
+    modes = ", ".join(f"`{m}`" for m in sorted({r["mode"] for r in rows}))
     header = (
         f"Source: `{rel}` ({len(rows)} rows, {len(queries)} queries, commit "
         f"{', '.join(f'`{c}`' for c in commits)}, query seed {rows[0]['query_seed']}, OMPL seed "
-        f"{rows[0]['ompl_seed']}, mode `{rows[0]['mode']}`, 10 s per cell"
+        f"{rows[0]['ompl_seed']}, modes {modes}, 10 s per cell"
         + (
             f", octomap {meta['octomap_voxels']} occupied 2 cm voxels, "
             f"total wall time {meta['total_wall_time_s'] / 60:.1f} min"
@@ -384,7 +391,11 @@ Every number here comes from `{rel}` through `scripts/aggregate.py`. Regenerate 
 - *Success* = MoveIt returned a trajectory that passed the `ValidateSolution` response adapter
   (collision-free against the frozen octomap snapshot and, for `orientation`, inside the path
   constraint at every waypoint) within the 10 s budget. Wilson 95 % intervals.
-- *Planning time* and *path lengths* are over successful cells only.
+- *Planning time* and *path lengths* are over successful cells only. Planning time is MoveIt's
+  `MotionPlanResponse::planning_time` (OMPL solve + simplification); failed cells leave it empty.
+- *Executed path collision-free*: of the successful trajectories, how many stay collision-free
+  against the snapshot when the time-parameterized trajectory is re-checked at 0.01 rad joint
+  steps (`ValidateSolution` only checks waypoints).
 - *Max tool tilt* is the angle between `tool0`'s z axis and world −z, evaluated on the path
   densified to 0.01 rad joint steps (what a joint trajectory controller executes between
   waypoints). The `orientation` constraint allows at most 5° (see docs/planners.md).
