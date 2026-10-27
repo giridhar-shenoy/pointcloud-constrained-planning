@@ -115,18 +115,19 @@ def summarise(rows: list[dict]) -> list[dict]:
 
 
 def by_query_class(rows: list[dict]) -> list[dict]:
-    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    groups: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
     for r in rows:
         cls = compartment_change(r["start_region"], r["goal_region"])
-        groups[(cls, r["constraint"])].append(r)
+        groups[(cls, r["planner"], r["constraint"])].append(r)
     out = []
-    for (cls, constraint), rs in sorted(groups.items()):
+    for (cls, planner, constraint), rs in sorted(groups.items()):
         k = sum(1 for r in rs if r["success"] == "1")
         lo, hi = wilson(k, len(rs))
         times = [float(r["planning_time_s"]) for r in rs if r["success"] == "1"]
         out.append(
             {
                 "class": cls,
+                "planner": PLANNER_LABEL.get(planner, planner),
                 "constraint": constraint,
                 "n": len(rs),
                 "successes": k,
@@ -168,13 +169,15 @@ def main_table(summary: list[dict]) -> str:
 
 def class_table(classes: list[dict]) -> str:
     lines = [
-        "| Query class | Constraint | Success (95 % Wilson CI) | Planning time median (s) |",
-        "|---|---|---|---|",
+        "| Query class | Planner | Constraint | Success (95 % Wilson CI) "
+        "| Planning time median (s) |",
+        "|---|---|---|---|---|",
     ]
     for c in classes:
         rate = c["successes"] / c["n"]
         lines.append(
-            f"| {c['class']} | {c['constraint']} | {c['successes']}/{c['n']} = {pct(rate)} "
+            f"| {c['class']} | {c['planner']} | {c['constraint']} | {c['successes']}/{c['n']} = "
+            f"{pct(rate)} "
             f"({pct(c['ci_lo'])}–{pct(c['ci_hi'])}) | {f(c['time_median_s'], 3)} |"
         )
     return "\n".join(lines)
@@ -204,23 +207,43 @@ def make_plots(rows: list[dict], out_dir: pathlib.Path) -> list[pathlib.Path]:
         }
     )
     out_dir.mkdir(parents=True, exist_ok=True)
-    constraints = [c for c in SERIES if any(r["constraint"] == c for r in rows)]
+    planners = sorted({r["planner"] for r in rows}, key=lambda p: (not p.startswith("RRT"), p))
+    combos = [
+        (pl, c)
+        for pl in planners
+        for c in SERIES
+        if any(r["planner"] == pl and r["constraint"] == c for r in rows)
+    ]
+    styles = ["-", "--", ":"]
+
+    def short(pl: str) -> str:
+        return PLANNER_LABEL.get(pl, pl).split(" (")[0]
+
     paths = []
 
     # 1. ECDF of planning time; failures sit at +inf so the curve tops out at the success rate.
-    fig, ax = plt.subplots(figsize=(6.4, 3.6), dpi=150)
-    for c in constraints:
-        rs = [r for r in rows if r["constraint"] == c]
+    fig, ax = plt.subplots(figsize=(8.0, 3.6), dpi=150)
+    for pl, c in combos:
+        rs = [r for r in rows if r["planner"] == pl and r["constraint"] == c]
         times = sorted(float(r["planning_time_s"]) for r in rs if r["success"] == "1")
         n = len(rs)
         xs, ys = [], []
         for i, t in enumerate(times, start=1):
             xs.append(t)
             ys.append(i / n)
-        ax.step(xs, ys, where="post", color=SERIES[c], linewidth=2, label=c)
+        label = f"{short(pl)}, {c}" if len(planners) > 1 else c
+        ax.step(
+            xs,
+            ys,
+            where="post",
+            color=SERIES[c],
+            linestyle=styles[planners.index(pl) % len(styles)],
+            linewidth=2,
+            label=label,
+        )
         if xs:
             ax.annotate(
-                f"{c}: {100 * ys[-1]:.0f} %",
+                f"{100 * ys[-1]:.0f} %",
                 (xs[-1], ys[-1]),
                 xytext=(6, 0),
                 textcoords="offset points",
@@ -231,8 +254,8 @@ def make_plots(rows: list[dict], out_dir: pathlib.Path) -> list[pathlib.Path]:
     ax.set_ylim(0, 1.02)
     ax.set_xlabel("planning time (s, log scale)")
     ax.set_ylabel("fraction of queries solved")
-    ax.set_title("RRTConnect on the octomap shelf: time to solve", loc="left", color=TEXT)
-    ax.legend(frameon=False, loc="lower right")
+    ax.set_title("Octomap shelf, 100 queries: time to solve", loc="left", color=TEXT)
+    ax.legend(frameon=False, loc="upper left", bbox_to_anchor=(1.0, 1.0))
     fig.tight_layout()
     p = out_dir / "bench_planning_time_ecdf.png"
     fig.savefig(p)
@@ -241,9 +264,11 @@ def make_plots(rows: list[dict], out_dir: pathlib.Path) -> list[pathlib.Path]:
 
     # 2. Max tool tilt along each successful path, per constraint type (strip plot).
     fig, ax = plt.subplots(figsize=(6.4, 2.8), dpi=150)
-    for i, c in enumerate(constraints):
+    for i, (pl, c) in enumerate(combos):
         tilts = [
-            float(r["max_tilt_deg"]) for r in rows if r["constraint"] == c and r["success"] == "1"
+            float(r["max_tilt_deg"])
+            for r in rows
+            if r["planner"] == pl and r["constraint"] == c and r["success"] == "1"
         ]
         jitter = [((k * 0.6180339887) % 1.0 - 0.5) * 0.5 for k in range(len(tilts))]
         ax.scatter(
@@ -253,21 +278,22 @@ def make_plots(rows: list[dict], out_dir: pathlib.Path) -> list[pathlib.Path]:
             color=SERIES[c],
             edgecolors=SURFACE,
             linewidths=0.6,
-            label=c,
         )
     ax.axvline(5.0, color=TEXT_2, linewidth=1, linestyle="--")
     ax.annotate(
         "5° limit",
-        (5.0, len(constraints) - 0.45),
+        (5.0, len(combos) - 0.45),
         xytext=(4, 0),
         textcoords="offset points",
         color=TEXT_2,
     )
-    ax.set_yticks(range(len(constraints)), constraints)
+    ax.set_yticks(
+        range(len(combos)),
+        [f"{short(pl)}, {c}" if len(planners) > 1 else c for pl, c in combos],
+    )
     ax.set_xscale("symlog", linthresh=10)
     ax.set_xlabel("max tool tilt from vertical along the executed path (deg)")
     ax.set_title("Does the cup stay upright?", loc="left", color=TEXT)
-    ax.legend(frameon=False, loc="lower right")
     fig.tight_layout()
     p = out_dir / "bench_max_tilt.png"
     fig.savefig(p)
@@ -333,16 +359,30 @@ def replace_between(text: str, start: str, end: str, body: str) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--csv", default=str(REPO / "results" / "bench.csv"))
+    ap.add_argument(
+        "--csv",
+        action="append",
+        help="benchmark CSV (repeatable); default results/bench.csv plus results/bench_bitrrt.csv "
+        "when it exists",
+    )
     ap.add_argument("--no-plots", action="store_true")
     ap.add_argument(
         "--print-only", action="store_true", help="print the table, write nothing (CI mini-bench)"
     )
     args = ap.parse_args()
-    csv_path = pathlib.Path(args.csv)
-    rows = load_rows(csv_path)
+    csv_paths = (
+        [pathlib.Path(c) for c in args.csv]
+        if args.csv
+        else [
+            p
+            for p in (REPO / "results" / "bench.csv", REPO / "results" / "bench_bitrrt.csv")
+            if p.exists()
+        ]
+    )
+    csv_path = csv_paths[0]
+    rows = [r for p in csv_paths for r in load_rows(p)]
     if not rows:
-        raise SystemExit(f"{csv_path} has no rows")
+        raise SystemExit(f"{csv_paths} have no rows")
     meta_path = pathlib.Path(str(csv_path) + ".meta.json")
     meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
     summary = summarise(rows)
@@ -356,6 +396,11 @@ def main() -> int:
     commits = sorted({r["commit"] for r in rows})
     queries = sorted({int(r["query_id"]) for r in rows})
     modes = ", ".join(f"`{m}`" for m in sorted({r["mode"] for r in rows}))
+    if len(csv_paths) > 1:
+        rel = " + ".join(
+            f"{p.resolve().relative_to(REPO) if p.resolve().is_relative_to(REPO) else p}"
+            for p in csv_paths
+        )
     header = (
         f"Source: `{rel}` ({len(rows)} rows, {len(queries)} queries, commit "
         f"{', '.join(f'`{c}`' for c in commits)}, query seed {rows[0]['query_seed']}, OMPL seed "

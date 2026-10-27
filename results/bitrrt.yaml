@@ -1,0 +1,6 @@
+# SHOULD item: BiTRRT column on the same 100 evaluation queries and the same constraints.
+/**:
+  ros__parameters:
+    bench:
+      planners: [BiTRRTRange2]
+      constraints: [none, orientation]
