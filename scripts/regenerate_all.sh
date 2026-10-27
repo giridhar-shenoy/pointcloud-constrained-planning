@@ -34,10 +34,23 @@ install/pcp_benchmark/lib/pcp_benchmark/generate_queries --urdf results/tmp/ur5e
   --srdf results/tmp/ur5e.srdf --scene src/pcp_scenes/config/shelf.yaml \
   --out results/tmp/queries.json --seed 0 --count 100
 cmp results/tmp/queries.json results/queries.json
-echo "[regenerate_all] queries.json regenerates byte for byte"
+install/pcp_benchmark/lib/pcp_benchmark/generate_queries --urdf results/tmp/ur5e_rgbd.urdf \
+  --srdf results/tmp/ur5e.srdf --scene src/pcp_scenes/config/shelf.yaml \
+  --out results/tmp/queries_seed1.json --seed 1 --count 20
+cmp results/tmp/queries_seed1.json results/tuning/queries_seed1.json
+echo "[regenerate_all] queries.json and the tuning set regenerate byte for byte"
 
 lock gazebo scripts/ci_smoke.sh
+# Tuning set (seed 1): how RRTConnect's range was chosen.
+lock gazebo scripts/bench_planners.sh 20 results/tuning/tuning.csv \
+  results/tuning/queries_seed1.json results/tuning/tuning.yaml
+# Evaluation set (seed 0): the README table, BiTRRT column, octomap resolution sweep.
 lock gazebo scripts/bench_planners.sh 100 results/bench.csv
-python3 scripts/aggregate.py --csv results/bench.csv
+lock gazebo scripts/bench_planners.sh 100 results/bench_bitrrt.csv results/queries.json \
+  results/bitrrt.yaml
+lock gazebo scripts/bench_octomap_resolution.sh 20 0.02 0.05
+# The 0.005-resolution ablation is regenerated at its own commit:
+#   git checkout 2f08131 && scripts/bench_planners.sh 100 results/ablation/bench_lvsf0.005.csv
+python3 scripts/aggregate.py
 lock gazebo scripts/record_gifs.sh results/bench.csv
 echo "[regenerate_all] done in $(( $(date +%s) - start )) s"
