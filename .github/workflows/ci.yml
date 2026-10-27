@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  actions: write  # docker layer cache (type=gha)
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: pcp:ci
+  # Every in-container step runs through this wrapper: the workspace is bind-mounted at /ws and
+  # the image entrypoint sources /opt/ros/lyrical (and /ws/install when it exists).
+  RUN_IN: >-
+    docker run --rm --user root -e HOME=/root -e CI=true
+    -e ROS_DOMAIN_ID=12 -e GZ_PARTITION=r2 -e MAKEFLAGS=-j4
+    -v ${{ github.workspace }}:/ws -w /ws pcp:ci
+
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Python for linters
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Lint (pre-commit)
+        run: |
+          python -m pip install --quiet pre-commit
+          pre-commit run --all-files --show-diff-on-failure
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image from Dockerfile (apt layers cached in the GHA cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: rosdep install
+        run: >-
+          $RUN_IN bash -c "apt-get update -qq && rosdep update --rosdistro lyrical -q &&
+          rosdep install --from-paths src --ignore-src -y --rosdistro lyrical"
+
+      - name: colcon build
+        run: >-
+          $RUN_IN bash -c "colcon build --symlink-install --parallel-workers 2
+          --cmake-args -DCMAKE_BUILD_TYPE=Release"
+
+      - name: colcon test
+        run: >-
+          $RUN_IN bash -c "colcon test --parallel-workers 1 --event-handlers console_direct+ &&
+          colcon test-result --verbose"

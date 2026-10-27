@@ -1,0 +1,16 @@
+# colcon
+build/
+install/
+log/
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.ruff_cache/
+# generated
+outputs/
+datasets/
+results/plots/
+results/tmp/
+*.bag

@@ -1,0 +1,29 @@
+{
+  "name": "pointcloud-constrained-planning (ROS 2 Lyrical)",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": ".."
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/ws,type=bind",
+  "workspaceFolder": "/ws",
+  "remoteUser": "dev",
+  "containerEnv": {
+    "ROS_DOMAIN_ID": "12",
+    "GZ_PARTITION": "r2"
+  },
+  "runArgs": ["--net=host", "--ipc=host"],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "ms-iot.vscode-ros",
+        "redhat.vscode-yaml",
+        "DavidAnson.vscode-markdownlint"
+      ]
+    }
+  },
+  "postCreateCommand": "python3 -m venv --system-site-packages /home/dev/.venv && /home/dev/.venv/bin/pip install pre-commit && /home/dev/.venv/bin/pre-commit install"
+}
