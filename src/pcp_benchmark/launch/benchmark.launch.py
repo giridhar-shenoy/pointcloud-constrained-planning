@@ -23,6 +23,10 @@ def generate_launch_description():
         "max_queries": "-1",
         "first_query": "0",
         "trajectory_dir": "",  # if set, save every successful trajectory there as JSON
+        # optional params file applied last (e.g. results/tuning/tuning.yaml)
+        "extra_params": PathJoinSubstitution(
+            [FindPackageShare("pcp_benchmark"), "config", "benchmark.yaml"]
+        ),
         # e.g. debug: prints "Using OMPL's constrained state space for planning." per request
         "ompl_log_level": "info",
     }
@@ -45,6 +49,7 @@ def generate_launch_description():
             moveit_config.to_dict(),
             octomap_params(),
             PathJoinSubstitution([FindPackageShare("pcp_benchmark"), "config", "benchmark.yaml"]),
+            LaunchConfiguration("extra_params"),
             {
                 "use_sim_time": True,
                 "bench.queries_file": LaunchConfiguration("queries_file"),

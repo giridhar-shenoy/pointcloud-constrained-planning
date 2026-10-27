@@ -265,6 +265,56 @@ def make_plots(rows: list[dict], out_dir: pathlib.Path) -> list[pathlib.Path]:
     return paths
 
 
+# Secondary CSVs rendered as their own sections: (file, title, explanation, regenerate command).
+EXTRA_SECTIONS = [
+    (
+        "results/tuning/tuning.csv",
+        "How RRTConnect's range was chosen (tuning set, not the evaluation set)",
+        "20 queries generated with seed 1 (`results/tuning/queries_seed1.json`), disjoint from the "
+        "seed-0 evaluation queries, orientation constraint only, four `range` settings. The best "
+        "success rate (ties: lower median time) became the benchmark planner configuration.",
+        "`scripts/bench_planners.sh 20 results/tuning/tuning.csv "
+        "results/tuning/queries_seed1.json results/tuning/tuning.yaml`",
+    ),
+    (
+        "results/ablation/bench_lvsf0.005.csv",
+        "Ablation: collision-check resolution 0.005 (MoveIt's usual value)",
+        "The same 100 evaluation queries with `longest_valid_segment_fraction: 0.005` and OMPL's "
+        "automatic range, i.e. the configuration before the fixes in docs/planners.md. On the "
+        "UR5e's 69 rad extent 0.005 means a collision check only every 0.35 rad; the unconstrained "
+        "failures here are `ValidateSolution` rejections (error -2), not planner timeouts.",
+        "`git checkout 2f08131 && scripts/bench_planners.sh 100 "
+        "results/ablation/bench_lvsf0.005.csv`",
+    ),
+]
+
+
+def extra_sections() -> tuple[str, list[str]]:
+    md, regen = [], []
+    for rel, title, text, cmd in EXTRA_SECTIONS:
+        path = REPO / rel
+        if not path.exists():
+            continue
+        rows = load_rows(path)
+        codes = defaultdict(int)
+        for r in rows:
+            if r["success"] != "1":
+                codes[(r["constraint"], r["error_code"])] += 1
+        failures = ", ".join(f"{c} code {e}: {n}" for (c, e), n in sorted(codes.items()))
+        commits = ", ".join(sorted({f"`{r['commit']}`" for r in rows}))
+        md.append(
+            f"## {title}\n\n{text}\n\nSource: `{rel}` ({len(rows)} rows, commit {commits}).\n\n"
+            f"{main_table(summarise(rows))}\n\n"
+            f"Failures by MoveIt error code: {failures or 'none'}.\n"
+        )
+        for srow in summarise(rows):
+            regen.append(
+                f"| {title.split(':')[0].split(' (')[0]}, {srow['planner']}, {srow['constraint']} "
+                f"| success rate | {pct(srow['success_rate'])} | {cmd} |"
+            )
+    return "\n".join(md), regen
+
+
 def replace_between(text: str, start: str, end: str, body: str) -> str:
     i, j = text.index(start) + len(start), text.index(end)
     return text[:i] + "\n" + body + "\n" + text[j:]
@@ -315,6 +365,7 @@ def main() -> int:
 
     plots = [] if args.no_plots else make_plots(rows, REPO / "docs" / "assets")
 
+    extra_md, extra_regen = extra_sections()
     results_md = (
         f"""# Results
 
@@ -348,6 +399,7 @@ across the middle board, or diagonal).
 
 {class_table(classes)}
 
+{extra_md}
 ## Regenerate
 
 | Benchmark | Metric | Value | Regenerate with |
@@ -359,6 +411,7 @@ across the middle board, or diagonal).
             for s in summary
         )
         + "\n"
+        + "".join(line + "\n" for line in extra_regen)
     )
     if plots:
         results_md += (
