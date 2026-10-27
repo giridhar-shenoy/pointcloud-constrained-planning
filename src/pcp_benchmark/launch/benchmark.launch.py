@@ -22,6 +22,8 @@ def generate_launch_description():
         "commit": "unknown",
         "max_queries": "-1",
         "first_query": "0",
+        # e.g. debug: prints "Using OMPL's constrained state space for planning." per request
+        "ompl_log_level": "info",
     }
     moveit_config = build_moveit_config()
     bench = Node(
@@ -31,6 +33,13 @@ def generate_launch_description():
         # Own namespace: MoveItCpp's planning-scene publisher must not feed back into move_group.
         namespace="pcp_benchmark",
         output="screen",
+        ros_arguments=[
+            "--log-level",
+            [
+                "pcp_benchmark.pcp_benchmark.moveit.planners.ompl:=",
+                LaunchConfiguration("ompl_log_level"),
+            ],
+        ],
         parameters=[
             moveit_config.to_dict(),
             octomap_params(),

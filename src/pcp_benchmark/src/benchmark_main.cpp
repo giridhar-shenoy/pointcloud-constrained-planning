@@ -5,6 +5,8 @@
 // the simulated depth camera, as published by move_group on /monitored_planning_scene), and
 // writes one CSV row per cell. Parameters: config/benchmark.yaml (all under `bench.`).
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <fstream>
 #include <iomanip>
@@ -126,6 +128,8 @@ int main(int argc, char ** argv)
   executor.add_node(node);
   std::thread spinner([&executor]() { executor.spin(); });
   int exit_code = 0;
+  // Outlives the try block so it is never destroyed while the executor spins its callbacks.
+  std::shared_ptr<moveit_cpp::MoveItCpp> moveit;
 
   try {
     const BenchParams p = loadParams(node);
@@ -136,9 +140,9 @@ int main(int argc, char ** argv)
     const auto query_set = pcp_benchmark::queriesFromJson(
       nlohmann::json::parse(pcp_benchmark::readFile(p.queries_file)));
 
-    auto moveit_cpp = std::make_shared<moveit_cpp::MoveItCpp>(node);
-    auto psm = moveit_cpp->getPlanningSceneMonitorNonConst();
-    const auto model = moveit_cpp->getRobotModel();
+    moveit = std::make_shared<moveit_cpp::MoveItCpp>(node);
+    auto psm = moveit->getPlanningSceneMonitorNonConst();
+    const auto model = moveit->getRobotModel();
     const auto * jmg = model->getJointModelGroup(p.group);
     if (jmg == nullptr || jmg->getVariableNames() != query_set.joint_names) {
       throw std::runtime_error("group variables do not match the joint order in queries.json");
@@ -183,7 +187,7 @@ int main(int argc, char ** argv)
            "rep,success,error_code,planning_time_s,wall_time_s,joint_path_rad,tcp_path_m,"
            "max_tilt_deg,n_waypoints,start_valid,goal_valid,octomap_voxels\n";
 
-    moveit_cpp::PlanningComponent planning(p.group, moveit_cpp);
+    moveit_cpp::PlanningComponent planning(p.group, moveit);
     pcp_benchmark::ConstraintSpec spec;
     spec.link_name = p.tip_link;
     spec.max_tilt_deg = p.max_tilt_deg;
@@ -293,5 +297,9 @@ int main(int argc, char ** argv)
   executor.cancel();
   spinner.join();
   rclcpp::shutdown();
-  return exit_code;
+  // MoveIt 2.15.2's ~MoveItCpp segfaults here (exit code -11, after "Deleting MoveItCpp"), even
+  // with the executor stopped. The CSV and metadata files are closed by now, so skip the
+  // destructor instead of turning a finished benchmark into a crashed process.
+  std::fflush(nullptr);
+  std::_Exit(exit_code);
 }

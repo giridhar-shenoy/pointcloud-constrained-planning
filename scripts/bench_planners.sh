@@ -19,6 +19,6 @@ mkdir -p "$(dirname "${OUT}")"
 start=$(date +%s)
 "${REPO}/scripts/with_sim.sh" ros2 launch pcp_benchmark benchmark.launch.py \
   queries_file:="${REPO}/results/queries.json" output_csv:="${REPO}/${OUT}" \
-  commit:="${COMMIT}" max_queries:="${N}"
+  commit:="${COMMIT}" max_queries:="${N}" ompl_log_level:="${PCP_OMPL_LOG_LEVEL:-info}"
 rows=$(($(wc -l <"${OUT}") - 1))
 echo "[bench_planners] ${rows} rows in ${OUT} (commit ${COMMIT}) in $(( $(date +%s) - start )) s"
