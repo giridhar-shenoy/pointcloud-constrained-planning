@@ -3,9 +3,8 @@
 /**:
   ros__parameters:
     bench:
-      queries_file: ""          # set by benchmark.launch.py
-      output_csv: ""            # set by benchmark.launch.py
-      commit: unknown           # set by scripts/bench_planners.sh
+      # queries_file, output_csv, commit, first_query and max_queries are launch arguments of
+      # benchmark.launch.py (a `/**` default here would take precedence over the launch values).
       pipeline: ompl
       group: ur_manipulator
       tip_link: tool0
@@ -16,8 +15,6 @@
       max_tilt_deg: 5.0         # keep-upright cone half-angle
       repetitions: 1
       ompl_seed: 0
-      first_query: 0
-      max_queries: -1           # -1 = all queries in queries_file
       octomap_timeout: 180.0    # s to wait for move_group's octomap
       octomap_settle: 3.0       # s the occupied-voxel count must stay unchanged
     planning_pipelines:
