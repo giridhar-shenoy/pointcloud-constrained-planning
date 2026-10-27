@@ -1,0 +1,24 @@
+# Benchmark parameters (feature prompt, SPRINT OVERRIDE MUST scope). Planner parameters live in
+# pcp_moveit_config/config/ompl_planning.yaml; nothing planner-related is set in code.
+/**:
+  ros__parameters:
+    bench:
+      queries_file: ""          # set by benchmark.launch.py
+      output_csv: ""            # set by benchmark.launch.py
+      commit: unknown           # set by scripts/bench_planners.sh
+      pipeline: ompl
+      group: ur_manipulator
+      tip_link: tool0
+      mode: constrained_state_space
+      planners: [RRTConnectkConfigDefault]
+      constraints: [none, orientation]
+      planning_time: 10.0       # s, per cell
+      max_tilt_deg: 5.0         # keep-upright cone half-angle
+      repetitions: 1
+      ompl_seed: 0
+      first_query: 0
+      max_queries: -1           # -1 = all queries in queries_file
+      octomap_timeout: 180.0    # s to wait for move_group's octomap
+      octomap_settle: 3.0       # s the occupied-voxel count must stay unchanged
+    planning_pipelines:
+      pipeline_names: [ompl]
