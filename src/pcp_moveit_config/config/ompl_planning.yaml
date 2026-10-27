@@ -17,14 +17,30 @@ response_adapters:
   - default_planning_response_adapters/DisplayMotionPath
 
 planner_configs:
+  # range 0 = OMPL picks 20 % of the state-space extent, i.e. 0.2 x 69.1 = 13.8 rad for the UR5e
+  # (see longest_valid_segment_fraction below for why the extent is so large).
   RRTConnectkConfigDefault:
     type: geometric::RRTConnect
-    range: 0.0  # 0 = OMPL picks 20 % of the state-space extent
+    range: 0.0
+  # Explicit ranges, compared on the TUNING query set (seed 1), never on the evaluation set
+  # (seed 0); see docs/planners.md "How range was chosen".
+  RRTConnectRange0_5:
+    type: geometric::RRTConnect
+    range: 0.5
+  RRTConnectRange1:
+    type: geometric::RRTConnect
+    range: 1.0
+  RRTConnectRange2:
+    type: geometric::RRTConnect
+    range: 2.0
 
 ur_manipulator:
   default_planner_config: RRTConnectkConfigDefault
   planner_configs:
     - RRTConnectkConfigDefault
+    - RRTConnectRange0_5
+    - RRTConnectRange1
+    - RRTConnectRange2
   # With path constraints present, plan in OMPL's ProjectedStateSpace (samples are projected
   # onto the constraint manifold) instead of rejection-sampling joint space. Requests without
   # path constraints still use the ordinary joint-space state space.
@@ -33,4 +49,8 @@ ur_manipulator:
   # state space: the first two joints dominate where the TCP is.
   projection_evaluator: joints(shoulder_pan_joint,shoulder_lift_joint)
   # Collision-check resolution along path segments, as a fraction of the state-space extent.
-  longest_valid_segment_fraction: 0.005
+  # MoveIt's extent is the SUM of the joint ranges: 5 x 4pi + 2pi (elbow) = 22pi = 69.1 rad for
+  # the UR5e. MoveIt's usual 0.005 would allow 0.35 rad between checks, enough for a link to step
+  # over a 2 cm octomap board; with 0.005 about 1 in 5 unconstrained plans were rejected by
+  # ValidateSolution (see docs/results.md, ablation). 0.0003 -> 0.021 rad between checks.
+  longest_valid_segment_fraction: 0.0003
