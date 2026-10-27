@@ -22,6 +22,7 @@ def generate_launch_description():
         "commit": "unknown",
         "max_queries": "-1",
         "first_query": "0",
+        "trajectory_dir": "",  # if set, save every successful trajectory there as JSON
         # e.g. debug: prints "Using OMPL's constrained state space for planning." per request
         "ompl_log_level": "info",
     }
@@ -54,6 +55,9 @@ def generate_launch_description():
                 ),
                 "bench.first_query": ParameterValue(
                     LaunchConfiguration("first_query"), value_type=int
+                ),
+                "bench.trajectory_dir": ParameterValue(
+                    LaunchConfiguration("trajectory_dir"), value_type=str
                 ),
             },
         ],

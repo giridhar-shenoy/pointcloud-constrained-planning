@@ -42,6 +42,7 @@ struct BenchParams
   std::string group = "ur_manipulator";
   std::string tip_link = "tool0";
   std::string mode = "constrained_state_space";
+  std::string trajectory_dir;  ///< if set, every successful trajectory is saved there as JSON
   std::vector<std::string> planners = {"RRTConnectkConfigDefault"};
   std::vector<std::string> constraints = {"none", "orientation"};
   double planning_time = 10.0;
@@ -64,6 +65,7 @@ BenchParams loadParams(const rclcpp::Node::SharedPtr & node)
   node->get_parameter("bench.group", p.group);
   node->get_parameter("bench.tip_link", p.tip_link);
   node->get_parameter("bench.mode", p.mode);
+  node->get_parameter("bench.trajectory_dir", p.trajectory_dir);
   node->get_parameter("bench.planners", p.planners);
   node->get_parameter("bench.constraints", p.constraints);
   node->get_parameter("bench.planning_time", p.planning_time);
@@ -243,6 +245,25 @@ int main(int argc, char ** argv)
               }
               metrics = pcp_benchmark::computePathMetrics(model, p.group, p.tip_link, path);
               ++successes;
+              if (!p.trajectory_dir.empty()) {
+                nlohmann::json points = nlohmann::json::array();
+                for (std::size_t w = 0; w < path.size(); ++w) {
+                  points.push_back(
+                    {{"t", response.trajectory->getWayPointDurationFromStart(w)}, {"q", path[w]}});
+                }
+                const nlohmann::json traj = {
+                  {"query_id", q.id},
+                  {"constraint", constraint_name},
+                  {"planner", planner},
+                  {"commit", p.commit},
+                  {"joint_names", query_set.joint_names},
+                  {"max_tilt_deg", metrics.max_tilt_deg},
+                  {"points", points},
+                };
+                std::ofstream(
+                  p.trajectory_dir + "/q" + std::to_string(q.id) + "_" + constraint_name + ".json")
+                  << traj.dump(1) << "\n";
+              }
             }
             ++cells;
             csv << p.commit << ',' << query_set.config.seed << ',' << p.ompl_seed << ',' << q.id
