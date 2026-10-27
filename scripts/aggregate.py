@@ -26,7 +26,12 @@ TEXT = "#0b0b0b"
 TEXT_2 = "#52514e"
 GRID = "#e4e3df"
 SERIES = {"none": "#2a78d6", "orientation": "#eb6834"}
-PLANNER_LABEL = {"RRTConnectkConfigDefault": "RRTConnect"}
+PLANNER_LABEL = {
+    "RRTConnectkConfigDefault": "RRTConnect (auto range, 13.8 rad)",
+    "RRTConnectRange0_5": "RRTConnect (range 0.5 rad)",
+    "RRTConnectRange1": "RRTConnect (range 1 rad)",
+    "RRTConnectRange2": "RRTConnect (range 2 rad)",
+}
 
 
 def wilson(k: int, n: int, z: float = Z95) -> tuple[float, float]:

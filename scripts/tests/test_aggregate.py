@@ -59,4 +59,4 @@ def test_summary_uses_successes_only_for_time_and_length():
     assert s["n"] == 3 and s["successes"] == 2
     assert math.isclose(s["time_median_s"], 0.2)
     assert s["joint_path_median_rad"] == 2.0
-    assert s["planner"] == "RRTConnect"
+    assert s["planner"] == "RRTConnect (auto range, 13.8 rad)"

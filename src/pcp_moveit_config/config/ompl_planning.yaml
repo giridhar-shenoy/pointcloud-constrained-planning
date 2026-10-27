@@ -41,7 +41,7 @@ planner_configs:
     range: 2.0
 
 ur_manipulator:
-  default_planner_config: RRTConnectkConfigDefault
+  default_planner_config: RRTConnectRange2
   planner_configs:
     - RRTConnectkConfigDefault
     - RRTConnectRange0_5
