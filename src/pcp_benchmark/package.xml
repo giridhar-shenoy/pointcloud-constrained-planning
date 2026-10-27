@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>pcp_benchmark</name>
+  <version>0.1.0</version>
+  <description>C++ benchmark on MoveItCpp: constraint builder, seeded query generator, runner and metrics.</description>
+  <maintainer email="giridharjshenoy@gmail.com">Giridhar J Shenoy</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>moveit_core</depend>
+  <depend>moveit_ros_planning</depend>
+  <depend>moveit_msgs</depend>
+  <depend>geometric_shapes</depend>
+  <depend>srdfdom</depend>
+  <depend>urdf</depend>
+  <depend>eigen</depend>
+  <depend>nlohmann-json-dev</depend>
+  <depend>yaml-cpp</depend>
+  <depend>liboctomap-dev</depend>
+  <depend>ompl</depend>
+
+  <build_depend>pcp_description</build_depend>
+  <build_depend>ur_moveit_config</build_depend>
+  <build_depend>ur_simulation_gz</build_depend>
+  <build_depend>xacro</build_depend>
+
+  <exec_depend>pcp_moveit_config</exec_depend>
+  <exec_depend>pcp_scenes</exec_depend>
+  <exec_depend>moveit_planners_ompl</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
