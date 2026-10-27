@@ -91,3 +91,54 @@ Anything that starts Gazebo: `flock ~/work/.locks/gazebo.lock timeout <s> <cmd>`
 - **IK for the generator**: own damped-least-squares IK on MoveIt's FK/Jacobian with a fixed
   iteration budget and seeds from the query RNG. The KDL plugin re-seeds from an unseeded RNG and
   stops on wall-clock timeouts, so it cannot give a byte-identical queries.json.
+
+### Progress log (session 1)
+
+- 03:44 skeleton pushed; CI refused by GitHub billing (MORNING.md item 1). 03:59 checkpoint 1.
+- 04:07 `generate_queries` → results/queries.json (100 queries, seed 0) in 0.5 s: 1007 pose
+  samples, 0 IK failures, 6151 converged-but-colliding solutions rejected (padded shelf).
+- 04:09 gtests: 14/14 pass (constraints 6, metrics 5, query determinism 3) + pcp_scenes pytest 3.
+- 04:12 first dry run failed: `/**` defaults in benchmark.yaml beat the launch overrides
+  (rclcpp applies the wildcard after the node-specific file) → those keys removed from the YAML.
+- 04:13–04:24 my with_sim.sh wait loop used `pgrep -f "gz sim"`, which matched my own parent
+  shell's command text, so it held the Gazebo lock ~10 min doing nothing while R1 waited. Fixed
+  with the pattern `[b]in/gz sim` (matches only the real `ruby .../bin/gz sim` server); the stuck
+  run was stopped through the task manager (a direct `kill` was refused by the sandbox).
+
+### Commands that worked
+
+```bash
+# build (uv's python3.14 shadows /usr/bin/python3 on PATH; CMake must use the system one)
+flock ~/work/.locks/build.lock colcon build --symlink-install --parallel-workers 2 \
+  --cmake-args -DPython3_EXECUTABLE=/usr/bin/python3
+colcon test --packages-select pcp_scenes pcp_benchmark && colcon test-result --verbose
+python3 -m pytest -q scripts/tests
+flock ~/work/.locks/gazebo.lock scripts/ci_smoke.sh             # 14 s locally
+flock ~/work/.locks/gazebo.lock scripts/bench_planners.sh 10 results/tmp/dry10.csv
+src/pcp_benchmark/scripts/make_robot_files.sh results/tmp/ur5e_rgbd.urdf results/tmp/ur5e.srdf
+install/pcp_benchmark/lib/pcp_benchmark/generate_queries --urdf results/tmp/ur5e_rgbd.urdf \
+  --srdf results/tmp/ur5e.srdf --scene src/pcp_scenes/config/shelf.yaml --out results/queries.json
+```
+
+### API / environment differences hit
+
+- launch_ros YAML-parses xacro output before using it as a string: a colon in an xacro comment
+  ("geometry: the camera") breaks `robot_description`. No colons in xacro comments.
+- `LockedPlanningSceneRO` has no `operator*` in 2.15; bind it to a
+  `const PlanningSceneConstPtr&` first.
+- rosdep key for octomap on Lyrical is `liboctomap-dev` (no `octomap` key).
+- gz rgbd_camera point cloud is in the sensor link frame (x forward), not the optical frame.
+
+### Decisions after the first 100-query run (04:30–04:47)
+
+- **Collision-check resolution bug (mine).** MoveIt's `ModelBasedStateSpace::getMaximumExtent()`
+  is the SUM of joint ranges: 22π ≈ 69.1 rad for the UR5e (±2π joints, elbow ±π). With the usual
+  `longest_valid_segment_fraction: 0.005`, OMPL checks motions only every ~0.35 rad, so paths can
+  step over 2 cm octomap boards; MoveIt's `ValidateSolution` then rejects them (error -2). In the
+  first run every unconstrained failure was -2. Fixed to 0.0003 (≈ 0.021 rad). The first run is
+  kept as an ablation (`results/ablation/bench_lvsf0.005.csv`, commit 2f08131).
+- **RRTConnect range.** `range: 0` means 20 % of that extent = 13.8 rad per extension. Instead of
+  tuning on the evaluation queries, range is chosen on a separate tuning set:
+  `results/tuning/queries_seed1.json` (seed 1, 20 queries), orientation constraint only, ranges
+  {auto, 0.5, 1, 2}; the winner is written into ompl_planning.yaml as the benchmark planner and
+  the seed-0 evaluation is run once with it.

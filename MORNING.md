@@ -17,3 +17,13 @@
 - **What it blocks:** the acceptance items "CI run on GitHub is green" (plumbing) and "CI green"
   (feature). Meanwhile I run the same build/lint/test/smoke commands natively on the laptop and log
   their output in CHECKPOINTS.md, and keep pushing only at checkpoints.
+
+### 2. Perceptyne L3 row in the README job-description table
+
+- **What:** the SPRINT OVERRIDE asks for a "How this maps to NUS 34489 / CMU NREC / Perceptyne L3"
+  table. The NUS and CMU phrases are quoted in the feature prompt; no Perceptyne L3 wording was in
+  my inputs, and I will not invent a JD quote.
+- **Why it needs you:** only you have the JD text.
+- **Recommendation:** paste the one phrase you most want to evidence (e.g. its motion-planning or
+  perception line); the README row currently reads "TODO(Giri): paste the exact JD phrase".
+- **What it blocks:** nothing else; one README row.
