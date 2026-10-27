@@ -73,3 +73,14 @@ jobs:
         run: >-
           $RUN_IN bash -c "colcon test --parallel-workers 1 --event-handlers console_direct+ &&
           colcon test-result --verbose"
+
+      - name: ci_smoke (sim + octomap + one RRTConnect plan, 240 s cap)
+        run: $RUN_IN bash -c "scripts/ci_smoke.sh"
+
+      - name: Upload sim logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sim-logs
+          path: log/sim/
+          if-no-files-found: ignore

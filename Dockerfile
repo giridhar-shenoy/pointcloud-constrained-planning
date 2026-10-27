@@ -44,6 +44,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ffmpeg \
       git \
       git-lfs \
+      procps \
       sudo \
     && rm -rf /var/lib/apt/lists/*
 
