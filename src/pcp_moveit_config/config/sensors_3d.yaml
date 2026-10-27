@@ -1,0 +1,16 @@
+# Octomap from the Gazebo rgbd_camera point cloud (bridged to /camera/points).
+sensors:
+  - camera_points
+camera_points:
+  sensor_plugin: occupancy_map_monitor/PointCloudOctomapUpdater
+  point_cloud_topic: /camera/points
+  # Everything the camera needs to see (shelf front, boards, walls) is within 1.9 m of it.
+  max_range: 2.0
+  # Keep every point: at 320x240 and 1 Hz the updater keeps up on one CPU core.
+  point_subsample: 1
+  # Self-filter: points inside the robot's links, padded by 3 cm, are removed before insertion,
+  # so the arm never sees itself as an obstacle.
+  padding_offset: 0.03
+  padding_scale: 1.0
+  max_update_rate: 1.0
+  filtered_cloud_topic: /camera/points_filtered

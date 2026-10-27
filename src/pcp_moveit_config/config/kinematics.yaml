@@ -1,0 +1,6 @@
+# KDL is used by move_group / RViz interactive goals only. The benchmark's query generator uses
+# its own deterministic damped-least-squares IK (see pcp_benchmark/src/query_generator.cpp).
+ur_manipulator:
+  kinematics_solver: kdl_kinematics_plugin/KDLKinematicsPlugin
+  kinematics_solver_search_resolution: 0.005
+  kinematics_solver_timeout: 0.005
