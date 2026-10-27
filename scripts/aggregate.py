@@ -274,6 +274,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", default=str(REPO / "results" / "bench.csv"))
     ap.add_argument("--no-plots", action="store_true")
+    ap.add_argument(
+        "--print-only", action="store_true", help="print the table, write nothing (CI mini-bench)"
+    )
     args = ap.parse_args()
     csv_path = pathlib.Path(args.csv)
     rows = load_rows(csv_path)
@@ -304,6 +307,10 @@ def main() -> int:
         + ")."
     )
     table = main_table(summary)
+    if args.print_only:
+        print(header)
+        print(table)
+        return 0
     (REPO / "results" / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
 
     plots = [] if args.no_plots else make_plots(rows, REPO / "docs" / "assets")
