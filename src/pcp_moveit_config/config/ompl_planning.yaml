@@ -1,0 +1,36 @@
+# OMPL pipeline for the benchmark. Every planner parameter lives here (none are set in code);
+# docs/planners.md lists them.
+planning_plugins:
+  - ompl_interface/OMPLPlanner
+# Request adapters run in this order before the planner.
+request_adapters:
+  - default_planning_request_adapters/ResolveConstraintFrames
+  - default_planning_request_adapters/ValidateWorkspaceBounds
+  - default_planning_request_adapters/CheckStartStateBounds
+  - default_planning_request_adapters/CheckStartStateCollision
+# ValidateSolution re-checks the returned path for collisions and path-constraint violations,
+# so "success" in bench.csv means the trajectory MoveIt hands back is valid, not just that OMPL
+# reported an exact solution.
+response_adapters:
+  - default_planning_response_adapters/AddTimeOptimalParameterization
+  - default_planning_response_adapters/ValidateSolution
+  - default_planning_response_adapters/DisplayMotionPath
+
+planner_configs:
+  RRTConnectkConfigDefault:
+    type: geometric::RRTConnect
+    range: 0.0  # 0 = OMPL picks 20 % of the state-space extent
+
+ur_manipulator:
+  default_planner_config: RRTConnectkConfigDefault
+  planner_configs:
+    - RRTConnectkConfigDefault
+  # With path constraints present, plan in OMPL's ProjectedStateSpace (samples are projected
+  # onto the constraint manifold) instead of rejection-sampling joint space. Requests without
+  # path constraints still use the ordinary joint-space state space.
+  enforce_constrained_state_space: true
+  # The projection used by OMPL's KPIECE-style bookkeeping and required by the constrained
+  # state space: the first two joints dominate where the TCP is.
+  projection_evaluator: joints(shoulder_pan_joint,shoulder_lift_joint)
+  # Collision-check resolution along path segments, as a fraction of the state-space extent.
+  longest_valid_segment_fraction: 0.005

@@ -1,0 +1,5 @@
+# 2 cm voxels: the thinnest obstacle in the shelf scene is a 2 cm board, so 2 cm is the coarsest
+# resolution that still represents every board as a solid layer; finer voxels multiply the
+# number of occupied cells (and FCL collision-check cost) by ~4x per halving of the voxel edge.
+octomap_frame: world
+octomap_resolution: 0.02
