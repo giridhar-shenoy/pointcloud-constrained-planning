@@ -31,10 +31,19 @@ BiTRRT (second column) is a SHOULD item and is not in v0.1.
 | Field | Value | Why |
 |---|---|---|
 | link | `tool0` | the flange; the queries' tool poses are flange poses |
-| target | z axis along world −z, yaw 0 (quaternion x=1, w=0) | "keep a cup upright" under a top grasp |
+| target | z axis along world −z, yaw = circular mean of the query's start and goal yaws | "keep a cup upright" under a top grasp; why the yaw matters: see below |
 | parameterization | `ROTATION_VECTOR` | the only one OMPL's constrained state space implements (exponential coordinates of R_ee⁻¹·R_target, `ompl_constraints.hpp`) |
 | x / y tolerance | 5°/√2 = 3.536° | for a rotation vector r, the tilt of the z axis is ≤ ‖(r_x, r_y)‖, so this square of tolerances lies inside the 5° cone: everything MoveIt accepts tilts ≤ 5° (checked by `test_constraints`, 2000 sampled states). It is conservative: a pure 4.9° tilt about x alone is rejected. |
 | z tolerance | π | yaw is free |
+
+**Yaw/tilt coupling.** The rotation vector mixes yaw into the x/y components: at a yaw offset ψ
+from the reference, ‖(r_x, r_y)‖ ≈ tilt · (ψ/2)/sin(ψ/2). With a fixed reference yaw the admissible
+tilt would shrink to ≈ 2.25° for a tool yawed by 180°, and half of the uniformly-yawed queries would
+face a tighter constraint than advertised (found in code review; `test_constraints` pins it: a 3°
+tilt is accepted with the reference at the tool's yaw and rejected with it 180° away). The reference
+yaw is therefore set per query halfway between start and goal yaw, so |ψ| ≤ 90° at both ends
+(factor ≤ 1.11). Effective admissible tilt: between ≈ 3.2° and 5° depending on tilt direction and
+yaw offset, never more than 5°. Along the path yaw can still drift further from the reference.
 
 **MoveIt limitation (v2.15.2, observed in `ompl_constraints.hpp` and the library's messages).**
 The constrained state space supports at most one position constraint (box regions only, with an
@@ -53,16 +62,36 @@ constraints and rejection-sampling mode are on the "What's next" list.
 | `projection_evaluator` | `joints(shoulder_pan_joint,shoulder_lift_joint)` | `ompl_planning.yaml` |
 | `longest_valid_segment_fraction` | 0.0003 (MoveIt sums the joint ranges into the extent, 22π ≈ 69.1 rad for the UR5e, so this is ≈ 0.021 rad between collision checks; 0.005 would be 0.35 rad) | `ompl_planning.yaml` |
 | request adapters | ResolveConstraintFrames, ValidateWorkspaceBounds, CheckStartStateBounds, CheckStartStateCollision | `ompl_planning.yaml` |
-| response adapters | AddTimeOptimalParameterization, ValidateSolution, DisplayMotionPath | `ompl_planning.yaml` |
+| response adapters | ValidateSolution, then AddTimeOptimalParameterization, DisplayMotionPath | `ompl_planning.yaml` |
+| time parameterization | `totg.path_tolerance` 0.01 rad (default 0.1), `resample_dt` 0.1 s | `ompl_planning.yaml` |
 | planning time per cell | 10 s | `benchmark.yaml` (`bench.planning_time`) |
 | planning attempts | 1 | `benchmark_main.cpp` (`PlanRequestParameters`, fixed by the benchmark protocol) |
 | velocity / acceleration scaling | 1.0 / 1.0 | `benchmark_main.cpp` (only affects time parameterization, not the path) |
-| OMPL seed | 0 (`ompl::RNG::setSeed` before the planner plugin loads) | `benchmark.yaml` (`bench.ompl_seed`) |
+| OMPL seed | 1 (`ompl::RNG::setSeed` before the planner plugin loads; OMPL replaces 0 by 1) | `benchmark.yaml` (`bench.ompl_seed`) |
 | octomap resolution | 0.02 m | `pcp_moveit_config/config/octomap.yaml` |
 
-`ValidateSolution` is kept on purpose: a cell counts as a success only if the trajectory MoveIt
-returns is collision-free against the snapshot and satisfies the path constraint at every
-waypoint, not merely if OMPL reported an exact solution.
+**What "success" means.** `ValidateSolution` runs first, on the planner's own waypoints (OMPL has
+already checked the motions between them at the `longest_valid_segment_fraction` resolution), so
+a success is a path that is collision-free against the snapshot and inside the path constraint at
+every waypoint. Time parameterization runs afterwards with corner blending capped at 0.01 rad. In
+the first version the order was reversed with MoveIt's default 0.1 rad blending, so validation saw
+0.1 s resamples of a blended path rather than the planned one (found in code review). The node
+also re-checks the executed, time-parameterized trajectory at 0.01 rad joint steps and reports it
+as `dense_collision_free`.
+
+**Collision-check resolution.** MoveIt's state-space extent is the *sum* of the joint ranges,
+22π ≈ 69.1 rad for the UR5e (±2π joints, elbow ±π). MoveIt's usual
+`longest_valid_segment_fraction: 0.005` therefore means a motion check only every ≈ 0.35 rad,
+enough for a link to step over a 2 cm board; in the first 100-query run all 17 unconstrained
+failures were `ValidateSolution` rejections (results.md, ablation). 0.0003 gives ≈ 0.021 rad.
+
+## How `range` was chosen
+
+RRTConnect's `range: 0` means 20 % of the same extent, 13.8 rad per extension. Four settings
+(automatic, 0.5, 1 and 2 rad) were compared on a separate tuning set — 20 queries generated with
+seed 1, disjoint from the seed-0 evaluation queries — with the orientation constraint only; the
+winner (highest success, ties broken by median time) is the benchmark planner. The evaluation set
+was not used to choose it. Table: [results.md](results.md#how-rrtconnects-range-was-chosen-tuning-set-not-the-evaluation-set).
 
 ## References
 
