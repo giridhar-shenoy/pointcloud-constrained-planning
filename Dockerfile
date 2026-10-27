@@ -36,6 +36,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3-numpy \
       python3-scipy \
       python3-yaml \
+      python3-pytest \
+      python3-pil \
       nlohmann-json3-dev \
       libyaml-cpp-dev \
       libegl1 \

@@ -11,8 +11,9 @@ cd "${REPO}"
 N="${1:-100}"
 OUT="${2:-results/bench.csv}"
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-12}" GZ_PARTITION="${GZ_PARTITION:-r2}"
-COMMIT="$(git rev-parse --short HEAD)"
-if ! git diff --quiet HEAD -- src results/queries.json; then
+GIT=(git -c safe.directory="${REPO}")  # CI runs as root on a runner-owned checkout
+COMMIT="$("${GIT[@]}" rev-parse --short HEAD)"
+if ! "${GIT[@]}" diff --quiet HEAD -- src results/queries.json; then
   COMMIT="${COMMIT}-dirty"
 fi
 mkdir -p "$(dirname "${OUT}")"
