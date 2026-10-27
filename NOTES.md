@@ -142,3 +142,23 @@ install/pcp_benchmark/lib/pcp_benchmark/generate_queries --urdf results/tmp/ur5e
   `results/tuning/queries_seed1.json` (seed 1, 20 queries), orientation constraint only, ranges
   {auto, 0.5, 1, 2}; the winner is written into ompl_planning.yaml as the benchmark planner and
   the seed-0 evaluation is run once with it.
+
+### Independent code review (subagent, read-only) — 04:50
+
+Findings acted on (commit 89533bb):
+
+1. TOTG ran before ValidateSolution with 0.1 rad blending → validation saw resampled, blended
+   waypoints. Now ValidateSolution first, `totg.path_tolerance: 0.01`, plus a dense (0.01 rad)
+   collision re-check of the executed trajectory (`dense_collision_free` column).
+2. Rotation-vector yaw/tilt coupling: with reference yaw 0 the admissible tilt dropped to ~2.25°
+   at 180° yaw offset. Reference yaw is now the circular mean of start/goal yaw per query; test
+   `ToleranceDependsOnYawOffsetFromReference` pins the coupling.
+3. (Unverified, MoveIt-side) the constrained validity checker re-checks path constraints with
+   exact tolerances while OMPL's projection stops at a 1e-4 residual → projected states may be
+   rejected. Not investigated tonight; listed in "where it fails" as a hypothesis.
+4–7. planning_time empty on failure; mode column derived from config; trajectory file names
+   include the planner; OMPL seed 1 (OMPL maps 0 → 1).
+Review found no problems in metrics.cpp, the IK frames, determinism, snapshot use, CSV alignment.
+
+The tuning run that had been queued before the review (still waiting for R1's lock) was
+stopped and re-queued after the fixes, so tuning uses the final pipeline.
