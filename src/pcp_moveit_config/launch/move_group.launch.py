@@ -11,6 +11,7 @@ from pcp_moveit_config import build_moveit_config, octomap_params
 
 def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
+    octomap = octomap_params()
     moveit_config = build_moveit_config()
     move_group = Node(
         package="moveit_ros_move_group",
@@ -18,8 +19,12 @@ def generate_launch_description():
         output="screen",
         parameters=[
             moveit_config.to_dict(),
-            octomap_params(),
+            octomap,
             {
+                # Overridable for the resolution sweep (scripts/bench_octomap_resolution.sh).
+                "octomap_resolution": ParameterValue(
+                    LaunchConfiguration("octomap_resolution"), value_type=float
+                ),
                 "use_sim_time": ParameterValue(use_sim_time, value_type=bool),
                 "publish_robot_description_semantic": True,
             },
@@ -28,6 +33,9 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("use_sim_time", default_value="true"),
+            DeclareLaunchArgument(
+                "octomap_resolution", default_value=str(octomap["octomap_resolution"])
+            ),
             move_group,
         ]
     )

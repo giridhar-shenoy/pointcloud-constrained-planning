@@ -80,6 +80,17 @@ BenchParams loadParams(const rclcpp::Node::SharedPtr & node)
   return p;
 }
 
+/// Leaf edge length (m) of the scene's octomap, 0 if there is none.
+double octomapResolution(const planning_scene::PlanningScene & scene)
+{
+  const auto object = scene.getWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
+  if (!object || object->shapes_.empty()) {
+    return 0.0;
+  }
+  const auto shape = std::dynamic_pointer_cast<const shapes::OcTree>(object->shapes_[0]);
+  return shape && shape->octree ? shape->octree->getResolution() : 0.0;
+}
+
 /// Occupied voxels at the finest resolution (pruned inner leaves count as 8^levels voxels).
 std::size_t occupiedVoxels(const planning_scene::PlanningScene & scene)
 {
@@ -343,6 +354,7 @@ int main(int argc, char ** argv)
       {"successes", successes},
       {"total_wall_time_s", total},
       {"octomap_voxels", voxels},
+      {"octomap_resolution_m", octomapResolution(*snapshot)},
       {"octomap_wait_s", std::chrono::duration<double>(bench_start - wait_start).count()},
       {"orientation_per_axis_tolerance_rad", pcp_benchmark::perAxisToleranceRad(p.max_tilt_deg)},
       {"hardware_threads", std::thread::hardware_concurrency()},
