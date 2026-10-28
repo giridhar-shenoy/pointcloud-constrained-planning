@@ -331,10 +331,12 @@ EXTRA_SECTIONS = [
     (
         "results/ablation/bench_lvsf0.005.csv",
         "Ablation: collision-check resolution 0.005 (MoveIt's usual value)",
-        "The same 100 evaluation queries with `longest_valid_segment_fraction: 0.005` and OMPL's "
-        "automatic range, i.e. the configuration before the fixes in docs/planners.md. On the "
-        "UR5e's 69 rad extent 0.005 means a collision check only every 0.35 rad; the unconstrained "
-        "failures here are `ValidateSolution` rejections (error -2), not planner timeouts.",
+        "The same 100 evaluation queries with the first configuration: "
+        "`longest_valid_segment_fraction: 0.005`, OMPL's automatic range, time parameterization "
+        "before `ValidateSolution` (0.1 rad blending), keep-upright reference yaw fixed at 0, OMPL "
+        "seed 0. On the UR5e's 69 rad extent 0.005 means a collision check only every 0.35 rad; "
+        "the unconstrained failures here are `ValidateSolution` rejections (error -2), not planner "
+        "timeouts.",
         "`git checkout 2f08131 && scripts/bench_planners.sh 100 "
         "results/ablation/bench_lvsf0.005.csv`",
     ),

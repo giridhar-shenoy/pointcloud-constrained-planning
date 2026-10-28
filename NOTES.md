@@ -162,3 +162,26 @@ Review found no problems in metrics.cpp, the IK frames, determinism, snapshot us
 
 The tuning run that had been queued before the review (still waiting for R1's lock) was
 stopped and re-queued after the fixes, so tuning uses the final pipeline.
+
+### Final evaluation and GIF (05:05–05:42)
+
+- Evaluation (commit 8c81742): unconstrained 100/100, keep-upright 84/100 (Wilson 76–90 %), all
+  16 failures 10 s timeouts; worst constrained tilt 3.6°; dense re-check 93/100 and 83/84.
+  7.7 min wall time.
+- GIF: `joint_trajectory_controller` had never initialized in the sim (ros2_control 6.10: no params
+  without `--param-file`); fixed in sim.launch.py. Demo camera pose must be given to
+  `ros_gz_sim create` as -x/-y/-z/-R/-P/-Y. Replays at 2× and 5× slow-down aborted on JTC path
+  tolerance (0.2 rad lag, arm clipping the shelf) → 15× slow-down, shown at 3×. Query 0 (7.6 s in
+  the benchmark) failed 3 re-plans → rule now requires the constrained cell within the median
+  time → query 2. Possible improvement: camera framing (arm sits at the left edge).
+- `ros2_control`/gz note for R1-style work: `position_proportional_gain` (gz_ros2_control,
+  default 0.1) governs position tracking in sim; not changed here.
+
+### Unverified items
+
+- GitHub Actions: nothing has run (billing). Docker image never built (no Docker locally).
+  Headless ogre2 on the runner's llvmpipe is unverified; if it fails, ci_smoke fails loudly (it
+  does not skip) and the fallback is the git-lfs bag, which needs Giri's approval.
+- Mermaid diagram in docs/architecture.md not render-checked (npx was not allowed).
+- VS Code extension id `ms-iot.vscode-ros` in devcontainer.json not checked against the
+  marketplace (that extension is deprecated upstream).
