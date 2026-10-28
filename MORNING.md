@@ -25,8 +25,8 @@
   docs/results.md, CHANGELOG, NOTES, CHECKPOINTS (0, 1, 2, final).
 
 **CI status:** never ran — GitHub refuses to start jobs on this account (billing). Latest run:
-<https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40607321438>
-(pushes after it will show the same). The identical steps pass locally (CHECKPOINTS.md, final).
+<https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40619295823>
+(final push, 653ad0a; "The job was not started because recent account payments have failed…"). The identical steps pass locally (CHECKPOINTS.md, final).
 
 **Things I got wrong overnight and fixed (worth knowing before the hour of questions):** the
 collision-check resolution, the validate/time-parameterize order, the yaw-dependent tolerance, a
