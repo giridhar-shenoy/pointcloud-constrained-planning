@@ -1,0 +1,28 @@
+{
+  "cells": 60,
+  "commit": "8c41f37",
+  "constraints": [
+    "orientation"
+  ],
+  "enforce_constrained_state_space": true,
+  "finished_utc": "2026-10-28T00:33:44Z",
+  "first_query": 0,
+  "hardware_threads": 8,
+  "octomap_resolution_m": 0.02,
+  "octomap_voxels": 4747,
+  "octomap_wait_s": 11.012495774,
+  "ompl_seed": 1,
+  "orientation_per_axis_tolerance_rad": 0.061706707474421744,
+  "planners": [
+    "BiTRRTkConfigDefault",
+    "BiTRRTRange2",
+    "BiTRRTRange6"
+  ],
+  "planning_time_s": 10.0,
+  "queries_file": "/home/giri/work/r2/results/tuning/queries_seed1.json",
+  "queries_run": 20,
+  "query_seed": 1,
+  "repetitions": 1,
+  "successes": 36,
+  "total_wall_time_s": 341.916696495
+}

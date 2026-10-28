@@ -1,4 +1,6 @@
 # SHOULD item: BiTRRT column on the same 100 evaluation queries and the same constraints.
+# BiTRRTRange2 was chosen on the seed-1 tuning set (results/tuning/tuning_bitrrt.csv) by the same rule
+# as RRTConnect: highest success, ties broken by lower median planning time.
 /**:
   ros__parameters:
     bench:
