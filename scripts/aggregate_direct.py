@@ -229,10 +229,16 @@ def main_table(sm: dict, agreement: dict | None) -> str:
             "yes (same metric)",
         ),
         (
-            "Path clean for the OTHER pipeline's checker at 0.01 rad",
+            "Path clean for the OTHER pipeline's checker at 0.01 rad (cross-validation)",
             f"{d['crossval_ok']}/{d['planned']}",
             f"{m['crossval_ok']}/{m['planned']}",
             "yes",
+        ),
+        (
+            "Path clean for its OWN checker at 0.01 rad",
+            f"{d['own_dense_ok']}/{d['planned']}",
+            f"{m['own_dense_ok']}/{m['planned']}",
+            "yes (a failure here is a discretisation miss, not a checker disagreement)",
         ),
     ]
     if d["executed_mode"] or m["executed_mode"]:
@@ -289,6 +295,55 @@ def agreement_paragraph(meta: dict, boundary: list[dict]) -> str:
         f"kinematics, MoveIt takes {meta['moveit_check_us_median']:.1f} µs and the direct checker "
         f"{meta['direct_check_us_median']:.1f} µs (median): Pinocchio tests every active pair "
         f"in a loop, while MoveIt's FCL environment runs a broadphase first."
+    )
+
+
+def probe_table(probe: list[dict]) -> str:
+    """Where the planning time goes: MoveIt's planner core (its own planning context with a
+    counting validity checker) vs the direct planner, on the same queries."""
+    ok = [e for e in probe if e["moveit"].get("success") and e["direct"].get("success")]
+    if not ok:
+        return "Probe not run."
+
+    def med(side: str, key: str) -> float:
+        return statistics.median(float(e[side][key]) for e in ok)
+
+    def share(side: str) -> float:
+        return statistics.median(
+            float(e[side]["check_time_total_s"])
+            / (float(e[side]["plan_time_s"]) + float(e[side]["simplify_time_s"]))
+            for e in ok
+        )
+
+    rows = [
+        (
+            "Validity checks per request",
+            f(med("direct", "validity_checks"), 0),
+            f(med("moveit", "validity_checks"), 0),
+        ),
+        (
+            "Time per check inside the planner (µs)",
+            f(med("direct", "check_time_us_median"), 1),
+            f(med("moveit", "check_time_us_median"), 1),
+        ),
+        ("OMPL solve (s)", f(med("direct", "plan_time_s")), f(med("moveit", "plan_time_s"))),
+        (
+            "Simplification (s)",
+            f(med("direct", "simplify_time_s")),
+            f(med("moveit", "simplify_time_s")),
+        ),
+        (
+            "Share of solve + simplify spent in the checker",
+            f"{100 * share('direct'):.0f} %",
+            f"{100 * share('moveit'):.0f} %",
+        ),
+    ]
+    return "\n".join(
+        [
+            f"| Median over {len(ok)} queries | Direct planner | MoveIt's planner core |",
+            "|---|---|---|",
+        ]
+        + [f"| {a} | {b} | {c} |" for a, b, c in rows]
     )
 
 
@@ -411,6 +466,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", default="results/bench_direct.csv")
     ap.add_argument("--agreement", default="results/collision_agreement.csv")
+    ap.add_argument("--probe", default="results/check_probe.csv")
     ap.add_argument("--no-plots", action="store_true")
     ap.add_argument("--print-only", action="store_true")
     args = ap.parse_args()
@@ -426,6 +482,12 @@ def main() -> int:
         bpath = agr_path.with_name(agr_path.stem + "_boundary.csv")
         boundary = load(bpath) if bpath.exists() else []
     table = main_table(sm, agreement)
+    probe_meta_path = REPO / (args.probe + ".meta.json")
+    probe = (
+        json.loads(probe_meta_path.read_text()).get("moveit_check_probe", [])
+        if probe_meta_path.exists()
+        else []
+    )
     mo = meta.get("moveit_ompl_context", {})
     source = (
         f"Source: `{args.csv}` ({len(rows)} rows, {sm['queries']} queries, "
@@ -468,6 +530,17 @@ def main() -> int:
 - Simplification took longer than the OMPL solve on {d.get("simplify_dominates", 0)} of
   {d["planned"]} direct plans.
 - Skipped queries (start or goal rejected by either checker): {len(sm["skipped_queries"])}.
+- Repositioning moves (direct planner, to each run's start): {meta["repositions_attempted"]}
+  attempted, {meta["reposition_failures"]} failed.
+
+### Where the planning time goes (probe)
+
+MoveIt's `planning_time` hides its internals, so a separate probe solves the first queries again
+in the OMPL planning context MoveIt builds for `plan()`, with MoveIt's own validity checker
+subclassed to count and time every call, and with the direct planner
+(`PCP_PROBE_QUERIES=20 scripts/bench_direct.sh 0 {args.probe} --plan-only`; adapters bypassed).
+
+{probe_table(probe)}
 
 ### Collision agreement (MoveIt's planning scene vs the direct checker)
 
