@@ -199,3 +199,8 @@ stopped and re-queued after the fixes, so tuning uses the final pipeline.
   BiTRRT joins its trees only within one `range` step of the L1 joint metric; in the projected
   space steps are re-projected and connections happen more often. Not verified.
 - I stopped my own BiTRRT run once (05:45) to let R1 run its final smoke test first.
+- 06:40 the stripped benchmark node never received an octomap: in 2.15 MoveItCpp's monitor
+  *listens* on `planning_scene` and *publishes* on `monitored_planning_scene`, and my remap had
+  pointed its publisher at move_group's topic. Fixed (56ea7e9): `planning_scene` →
+  `/monitored_planning_scene`. 2-query check: snapshot = move_group's map, 4747 voxels at 2 cm, the
+  same count as the old self-built map. Re-running sweep, evaluation and BiTRRT after this fix.
