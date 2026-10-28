@@ -1,0 +1,6 @@
+# BiTRRT range selection on the tuning set (seed 1), orientation constraint only, same rule as RRTConnect.
+/**:
+  ros__parameters:
+    bench:
+      planners: [BiTRRTkConfigDefault, BiTRRTRange2, BiTRRTRange6]
+      constraints: [orientation]

@@ -31,6 +31,9 @@ PLANNER_LABEL = {
     "RRTConnectRange0_5": "RRTConnect (range 0.5 rad)",
     "RRTConnectRange1": "RRTConnect (range 1 rad)",
     "RRTConnectRange2": "RRTConnect (range 2 rad)",
+    "BiTRRTkConfigDefault": "BiTRRT (auto range, 13.8 rad)",
+    "BiTRRTRange2": "BiTRRT (range 2 rad)",
+    "BiTRRTRange6": "BiTRRT (range 6 rad)",
 }
 
 
@@ -312,6 +315,14 @@ EXTRA_SECTIONS = [
         "success rate (ties: lower median time) became the benchmark planner configuration.",
         "`scripts/bench_planners.sh 20 results/tuning/tuning.csv "
         "results/tuning/queries_seed1.json results/tuning/tuning.yaml`",
+    ),
+    (
+        "results/tuning/tuning_bitrrt.csv",
+        "How BiTRRT's range was chosen (tuning set)",
+        "Same protocol as for RRTConnect: the 20 seed-1 tuning queries, orientation constraint "
+        "only, three `range` settings; the highest success rate became the BiTRRT column.",
+        "`scripts/bench_planners.sh 20 results/tuning/tuning_bitrrt.csv "
+        "results/tuning/queries_seed1.json results/tuning/tuning_bitrrt.yaml`",
     ),
     (
         "results/sweep/octomap_0.02.csv",
