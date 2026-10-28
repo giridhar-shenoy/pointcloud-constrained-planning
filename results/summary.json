@@ -1,0 +1,38 @@
+[
+  {
+    "planner": "RRTConnect (range 2 rad)",
+    "constraint": "none",
+    "n": 100,
+    "successes": 100,
+    "success_rate": 1.0,
+    "ci_lo": 0.9630065017930143,
+    "ci_hi": 1.0,
+    "time_median_s": 0.38246,
+    "time_p95_s": 0.9154423999999999,
+    "joint_path_median_rad": 4.74662,
+    "tcp_path_median_m": 1.139265,
+    "tilt_median_deg": 51.918000000000006,
+    "tilt_max_deg": 177.176,
+    "dense_ok": 93,
+    "dense_checked": 100,
+    "invalid_queries": 0
+  },
+  {
+    "planner": "RRTConnect (range 2 rad)",
+    "constraint": "orientation",
+    "n": 100,
+    "successes": 84,
+    "success_rate": 0.84,
+    "ci_lo": 0.7557973061072976,
+    "ci_hi": 0.8990471151119521,
+    "time_median_s": 2.0141305000000003,
+    "time_p95_s": 8.257480899999997,
+    "joint_path_median_rad": 4.996452,
+    "tcp_path_median_m": 1.549696,
+    "tilt_median_deg": 1.3815,
+    "tilt_max_deg": 3.633,
+    "dense_ok": 83,
+    "dense_checked": 84,
+    "invalid_queries": 0
+  }
+]
