@@ -469,6 +469,50 @@ int main(int argc, char ** argv)
       last = std::min(last, first + static_cast<std::size_t>(p.max_queries));
     }
 
+    // Recovery (harness, not part of either pipeline): an aborted execution can leave the arm
+    // stopped against the shelf, in a configuration the planner rejects as a start. The first
+    // full run cascaded from one such abort (NOTES.md). Escape: sample boxes of growing size
+    // around the measured configuration, take the closest collision-free sample with >= 5 mm
+    // clearance, move there in a straight joint-space line, then plan as usual.
+    pcp_benchmark::DeterministicRng escape_rng(static_cast<std::uint64_t>(p.ompl_seed));
+    std::size_t escapes = 0;
+    std::size_t escape_failures = 0;
+    auto escape = [&](const std::vector<double> & from) -> bool {
+      ++escapes;
+      for (const double radius : {0.02, 0.05, 0.1, 0.2, 0.4}) {
+        std::vector<double> best;
+        double best_d = std::numeric_limits<double>::infinity();
+        for (int k = 0; k < 400; ++k) {
+          std::vector<double> c(from);
+          for (std::size_t j = 0; j < c.size(); ++j) {
+            c[j] = std::clamp(
+              from[j] + escape_rng.uniform(-radius, radius), checker.lowerLimits()[j],
+              checker.upperLimits()[j]);
+          }
+          const double d = maxAbsDiff(c, from);
+          if (
+            d >= best_d || checker.isColliding(c) || checker.minimumDistance(c).distance < 0.005) {
+            continue;
+          }
+          best = c;
+          best_d = d;
+        }
+        if (best.empty()) {
+          continue;
+        }
+        RCLCPP_WARN(kLog, "escape: moving %.3f rad to a collision-free configuration", best_d);
+        const auto traj = pcp_direct::parameterise({from, best}, limits, p.sample_dt);
+        exec->execute(traj.msg, traj.duration_s + p.exec_timeout_margin);
+        exec->waitUntilAt(best, 0.02, 5.0);
+        const auto now = exec->currentPositions();
+        if (!now.empty() && !checker.isColliding(now)) {
+          return true;
+        }
+      }
+      ++escape_failures;
+      return false;
+    };
+
     // Moves the arm (direct planner + trapezoid + action) to `target`; true when there.
     auto reposition = [&](const std::vector<double> & target) -> bool {
       auto q = exec->currentPositions();
@@ -482,6 +526,13 @@ int main(int argc, char ** argv)
       bool ok = false;
       for (int attempt = 0; attempt < 2 && !ok; ++attempt) {
         q = exec->currentPositions();
+        if (checker.isColliding(q)) {
+          RCLCPP_WARN(kLog, "reposition: the arm is in collision, escaping first");
+          if (!escape(q)) {
+            continue;
+          }
+          q = exec->currentPositions();
+        }
         const auto r = planner.plan(q, target);
         if (!r.success) {
           RCLCPP_WARN(kLog, "reposition: plan failed (%s)", r.status.c_str());
@@ -704,6 +755,8 @@ int main(int argc, char ** argv)
       {"execute", p.execute},
       {"repositions_attempted", returns_attempted},
       {"reposition_failures", return_failures},
+      {"escapes", escapes},
+      {"escape_failures", escape_failures},
       {"total_wall_time_s", total},
       {"planner_config", settings.planner_config},
       {"range_rad", planner.effectiveRange()},
