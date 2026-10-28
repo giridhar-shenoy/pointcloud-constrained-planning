@@ -273,3 +273,101 @@ in the repo standard's list (feat/fix/docs/ci/test/chore/refactor). History is n
   (checkout, setup-python, cache, build-push-action, setup-buildx-action) target Node.js 20 and
   are forced onto Node.js 24 by the runner. Left unchanged; listed as an open question.
 - Commands: `gh run watch 40649038811 --exit-status` (exit 0), `gh run view 40649038811 --log`.
+
+## Session 2 — 2026-10-29, v0.2 "direct pipeline" (SPRINT OVERRIDE v0.2)
+
+Environment for every shell: `export ROS_DOMAIN_ID=12 GZ_PARTITION=r2 MAKEFLAGS=-j4`; builds under
+`flock ~/work/.locks/build.lock`, Gazebo under `flock ~/work/.locks/gazebo.lock timeout <s>`.
+All v0.2 work is on branch `feat/direct-pipeline`; v0.1 code is reused, not edited.
+
+### Plan (numbered as in the override; CHECKPOINTs in bold)
+
+0. CI green on main (done before this plan; see "Step 0" above). Branch `feat/direct-pipeline`.
+   **CHECKPOINT 1.**
+1. `src/pcp_direct` (ament_cmake, C++17, Eigen). Libraries with no MoveIt dependency:
+   `pcp_direct_collision`, `pcp_direct_planner`, `pcp_direct_traj`, `pcp_direct_exec`.
+   Executables that link MoveIt only to act as the reference: `collision_agreement`,
+   `bench_direct`, plus the `shelf_boxes_loader` node.
+2. Collision module (`collision.hpp/.cpp`):
+   - `pinocchio::urdf::buildModelFromXML` + `buildGeom(..., COLLISION, ...)` on the same URDF string
+     MoveIt loads (`ur5e_rgbd.urdf.xacro` expanded; collision meshes are ur_description's STLs).
+   - Shelf boxes as `coal::Box` GeometryObjects on the universe joint, from
+     `pcp_scenes/config/shelf.yaml` (see decision D1: that file already is the single box
+     definition the Gazebo world is generated from; a second `shelf_boxes.yaml` would be a copy).
+   - `addAllCollisionPairs()`, then `pinocchio::srdf::removeCollisionPairsFromXML` with the SRDF
+     MoveIt loads (xacro of `ur.srdf.xacro name:=ur`).
+   - Pinocchio never pairs two geometries on the same joint, so robot geometries fixed to the
+     universe (base, ground_plane) get no pairs with the boxes; MoveIt checks every robot link
+     against every world object. Those pairs are added explicitly so both checkers test the same
+     pair set; a unit test compares the active pair count with the count derived from MoveIt's
+     ACM.
+   - `isValid(q)`: bounds + `computeCollisions(..., stopAtFirstCollision=true)`; counts calls and
+     records per-call time; `collidingPairs(q)` and `minDistance(q)` for the agreement report.
+   - Padding 0 on both sides (MoveIt default; checked that pcp_moveit_config sets none).
+   - gtests: home configuration free; a known self-colliding configuration; a configuration with
+     a link inside a shelf box; SRDF-disabled pair count; active pair count == MoveIt's.
+3. `shelf_boxes_loader` node: publishes the same YAML as `moveit_msgs/CollisionObject` boxes to the
+   bench/agreement node's planning-scene monitor (own namespace, so move_group's scene in the sim
+   is untouched).
+4. Agreement test `collision_agreement` (+ `launch/agreement.launch.py`, no Gazebo):
+   MoveItCpp's planning-scene monitor (no `sensors_3d`, so no octomap updater) with the boxes from
+   the loader vs the direct checker, on 500 seeded uniform configurations; both checkers timed per
+   call. `results/collision_agreement.csv` keeps every row (q, verdicts, colliding pairs from each,
+   min distance from each); docs/results.md gets the paragraph. Nothing is tuned to raise agreement.
+   **CHECKPOINT 2** (unit tests, CSV, agreement %).
+5. Direct planner (`planner.hpp/.cpp`): 6-D real-vector joint space with URDF bounds, SimpleSetup,
+   the collision module as validity checker, RRTConnect, 10 s, `simplifySolution(budget)`.
+   Settings are READ from `pcp_moveit_config/config/ompl_planning.yaml` (default planner config of
+   `ur_manipulator`, its `range`, and `longest_valid_segment_fraction`) so they cannot drift.
+   Decision D2 (metric) below. Records plan time, simplify time, validity checks, median check time.
+6. Queries `results/queries_boxes.json`: seed 0, 100 queries, v0.1 generator on the box shelf; gtest
+   regenerates it byte for byte; every start/goal validated by both checkers at run time, rejected
+   queries skipped and counted (decision D3).
+7. Time parameterisation (`traj.hpp/.cpp`): R1's header-only trapezoidal generator copied into
+   `include/pcp_direct/traj/trapezoidal.hpp` with an origin comment; limits from
+   `pcp_direct/config/joint_limits.yaml` (decision D4); output `trajectory_msgs/JointTrajectory`
+   sampled with the 1/3-rule phase boundaries included. gtests: limits respected, waypoints hit,
+   durations.
+8. Execution (`exec.hpp/.cpp`): FollowJointTrajectory client on `/joint_trajectory_controller`;
+   MoveIt side `MoveItCpp::execute()` (trajectory execution manager, same controller). Both record
+   sim-time duration, max tracking error = |/joint_states − controller reference| (reference from
+   the JTC's `controller_state`, matched by stamp, the same for both pipelines), success = action
+   SUCCEEDED and final error ≤ 0.01 rad. After every execution the direct planner moves the arm to
+   the next run's start; failures to return are counted.
+9. Cross-validation: every direct path densified to 0.01 rad and checked by MoveIt's scene; every
+   MoveIt path by the direct checker (`crossval_ok`), plus each pipeline's own dense check.
+10. `bench_direct` + `scripts/bench_direct.sh` (100 queries × {direct, moveit} × RRTConnect ×
+    unconstrained × 1 rep; `execute:=false` mode for CI). CSV columns exactly as in the override,
+    extras appended at the end. **Dry run 5 queries (needs Gazebo: ask first), project the total,
+    CHECKPOINT 3; full run only on Giri's go (Friday 20:00 IST).**
+11. `scripts/aggregate_direct.py`: median/p95 per column, Wilson 95 % for success, paired
+    log-log scatter of planning time; tables into docs/results.md.
+12. README section, fairness paragraph, "where it fails" items, architecture lane, CHANGELOG.
+13. CI on the branch: collision + query-determinism gtests, 5-query plan-only mini-benchmark
+    (no Gazebo, < 3 min), agreement on 50 configurations in the ci_smoke step. Merge only if CI is
+    green and the 100-query table exists, and only after asking; else defer by Saturday 12:00 IST.
+    **CHECKPOINT 4.**
+14. SHOULD (only after MUST is green): keep-upright via `ompl::base::Constraint` +
+    `ProjectedStateSpace`; shared octomap as one `coal::OcTree`.
+
+### Decisions to confirm (D1–D5)
+
+- D1 boxes file: reuse `src/pcp_scenes/config/shelf.yaml` (already the one definition used by the
+  Gazebo world and the v0.1 generator) instead of adding `config/shelf_boxes.yaml`.
+- D2 metric: MoveIt's joint state space measures distance as the SUM of per-joint distances (L1)
+  and its extent as the SUM of joint ranges (69.1 rad); OMPL's plain `RealVectorStateSpace` uses
+  the Euclidean norm (extent 28.8 rad). With the same `longest_valid_segment_fraction` (0.0003) and
+  `range` (2 rad) the plain space would check every 0.0086 rad (L2) instead of every 0.021 rad
+  (L1) and take differently sized RRT steps. Plan: subclass `RealVectorStateSpace` and override only
+  `distance()` and `getMaximumExtent()` to MoveIt's definitions, so the same numbers mean the same
+  thing. Plain L2 run kept as an ablation only if time allows.
+- D3 queries: the v0.1 generator already sampled against the shelf BOXES (padded 3 cm), not the
+  octomap, so seed 0 regenerates a `queries_boxes.json` byte-identical to `queries.json`. Keep it
+  that way (separate file name per table, identical content, both determinism-tested).
+- D4 limits: `joint_trajectory_controller` in `ur_simulation_gz/config/ur_controllers.yaml` has no
+  velocity/acceleration limits (only path 0.2 rad / goal 0.1 rad tolerances). MoveIt's TOTG uses
+  the URDF velocity (π rad/s) and `ur_moveit_config` acceleration (5 rad/s²); the direct
+  pipeline's `joint_limits.yaml` uses exactly those, so both parameterisers share limits.
+- D5 sim: `scripts/with_sim.sh` + v0.1 `sim.launch.py` unchanged (move_group keeps building its
+  octomap in the background; v0.2 does not read its scene). Both pipelines share that background
+  load.
