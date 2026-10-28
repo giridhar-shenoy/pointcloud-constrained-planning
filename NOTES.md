@@ -296,11 +296,13 @@ All v0.2 work is on branch `feat/direct-pipeline`; v0.1 code is reused, not edit
      definition the Gazebo world is generated from; a second `shelf_boxes.yaml` would be a copy).
    - `addAllCollisionPairs()`, then `pinocchio::srdf::removeCollisionPairsFromXML` with the SRDF
      MoveIt loads (xacro of `ur.srdf.xacro name:=ur`).
-   - Pinocchio never pairs two geometries on the same joint, so robot geometries fixed to the
-     universe (base, ground_plane) get no pairs with the boxes; MoveIt checks every robot link
-     against every world object. Those pairs are added explicitly so both checkers test the same
-     pair set; a unit test compares the active pair count with the count derived from MoveIt's
-     ACM.
+   - Pair sets (corrected after reading the sources, see "Source facts" below): Pinocchio never
+     pairs two geometries on the same joint, so universe-fixed geometries (base, ground_plane,
+     shelf boxes) are never paired with each other; MoveIt's planner sends `group_name =
+     ur_manipulator`, and FCL skips every pair in which neither object moves with the group.
+     The two rules select the same pairs here, so nothing is added by hand; a unit test checks
+     that the active pair count equals the count derived from MoveIt's ACM and group links. The
+     agreement test uses the same `group_name` request as MoveIt's OMPL validity checker.
    - `isValid(q)`: bounds + `computeCollisions(..., stopAtFirstCollision=true)`; counts calls and
      records per-call time; `collidingPairs(q)` and `minDistance(q)` for the agreement report.
    - Padding 0 on both sides (MoveIt default; checked that pcp_moveit_config sets none).
@@ -371,3 +373,44 @@ All v0.2 work is on branch `feat/direct-pipeline`; v0.1 code is reused, not edit
 - D5 sim: `scripts/with_sim.sh` + v0.1 `sim.launch.py` unchanged (move_group keeps building its
   octomap in the background; v0.2 does not read its scene). Both pipelines share that background
   load.
+
+### Source facts that shape v0.2 (read from tags moveit2 2.15.2, ompl 2.0.2, pinocchio v4.1.0, coal v3.0.3)
+
+Read-only research by a sub-agent (shallow clones of the exact tags, installed headers diffed
+against them); the items below are the ones the code depends on. File:line refs are in the tags.
+
+- MoveIt `res.planning_time` = OMPL solve time + simplification time; interpolation and the
+  response adapters (TOTG) are outside it (`model_based_planning_context.cpp` 453-461). The
+  simplifier gets `allowed_planning_time − plan time` with `atLeastOnce=true`.
+- After simplification MoveIt interpolates the path to every state the motion validator checks
+  (`pg.interpolate()`, `validSegmentCount` per segment); `max_solution_segment_length` is never
+  set in 2.15. TOTG then runs on that dense path.
+- MoveIt's joint space: distance = Σ|Δq| (distance factor 1 per revolute joint), extent = Σ ranges,
+  linear interpolation (`joint_model_group.cpp` 455-490, `revolute_joint_model.cpp`). OMPL
+  `RealVectorStateSpace`: L2 distance, extent = diagonal norm. → decision D2.
+- `longest_valid_segment_fraction` is set through `SpaceInformation::params()` and ends in
+  `StateSpace::setLongestValidSegmentFraction`, i.e. the same call as
+  `setStateValidityCheckingResolution`. `range` is set through the planner params and compared with
+  the space's own distance.
+- Motion validator: OMPL's default `DiscreteMotionValidator` (checks the end state, then bisects
+  the interior states; the start is assumed valid).
+- Validity checker (unconstrained): bounds → (no path constraints) → `checkCollision` with
+  `group_name` set, no contacts, no distance; world check first, then self check with the ACM.
+- Default collision detector is FCL; meshes are `fcl::BVHModel<OBBRSS>`; padding 0, scale 1 unless
+  `robot_description_planning.default_robot_padding/scale` are set (they are not here).
+- Pinocchio `addAllCollisionPairs` keeps a pair iff the two `parentJoint`s differ;
+  `removeCollisionPairsFromXML` handles `<disable_collisions>` only, mapping link names to BODY
+  frames (fixed-joint merges handled). coal meshes are `BVHModel<OBBRSS>`; `security_margin` 0;
+  Pinocchio sets `distance_upper_bound = security_margin + 1e-6`.
+- Pinocchio 4.1 `GeometryObject(name, parent_joint, parent_frame, placement, geometry)`; the old
+  argument order is deprecated. `coal::Box(x, y, z)` takes full side lengths.
+- MoveItCpp `PlanRequestParameters` defaults to 5 parallel attempts with hybridization when loaded
+  from parameters; v0.1 and v0.2 set `planning_attempts = 1` explicitly.
+- MoveIt's goal is a `GoalLazySamples` (background sampling thread) on a joint goal with
+  tolerance DBL_EPSILON; the direct planner uses a plain goal state.
+- `ompl::RNG::setSeed` does not seed MoveIt's state sampler (it uses
+  `random_numbers::RandomNumberGenerator`), so MoveIt plans are not seed-reproducible.
+- OMPL 2.0: `PathSimplifier::shortcutPath` was renamed `partialShortcutPath`; the SimpleSetup,
+  RRTConnect, SpaceInformation and RealVector headers used here are otherwise unchanged from 1.6.
+- The expanded URDF has no `<safety_controller>`, so MoveIt's joint bounds equal the `<limit>`
+  values Pinocchio reads (±2π, elbow ±π); a test asserts it.
