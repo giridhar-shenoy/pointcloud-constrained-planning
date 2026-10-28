@@ -44,6 +44,7 @@ def generate_launch_description():
                 "agree.output_csv": LaunchConfiguration("output_csv"),
                 "agree.count": ParameterValue(LaunchConfiguration("count"), value_type=int),
                 "agree.seed": ParameterValue(LaunchConfiguration("seed"), value_type=int),
+                "agree.commit": ParameterValue(LaunchConfiguration("commit"), value_type=str),
             },
         ],
     )
@@ -60,6 +61,7 @@ def generate_launch_description():
             DeclareLaunchArgument("output_csv", default_value="results/collision_agreement.csv"),
             DeclareLaunchArgument("count", default_value="500"),
             DeclareLaunchArgument("seed", default_value="0"),
+            DeclareLaunchArgument("commit", default_value="unknown"),
             agreement,
             loader,
             RegisterEventHandler(
