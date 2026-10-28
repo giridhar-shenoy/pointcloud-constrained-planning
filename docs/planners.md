@@ -36,7 +36,9 @@ is no meaningful state cost, so the transition test mostly adds rejections witho
 predict that BiTRRT needs many more nodes than RRTConnect to close the gap, and in the projected
 state space each node costs a projection. The first attempt reused RRTConnect's 2 rad range and
 timed out on every unconstrained query it reached; BiTRRT's range is therefore chosen on the
-tuning set by the same rule (results.md), and the evaluation numbers are in results.md.
+tuning set by the same rule (results.md). The chosen 2 rad keeps BiTRRT level with RRTConnect on
+the keep-upright queries, but it still solves no unconstrained query within 10 s; the single-step
+tree joining in an L1 joint metric is my working explanation, not a verified one.
 
 ## Keep-upright orientation constraint
 

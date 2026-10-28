@@ -81,7 +81,9 @@ def summarise(rows: list[dict]) -> list[dict]:
     for r in rows:
         groups[(r["planner"], r["constraint"])].append(r)
     out = []
-    for (planner, constraint), rs in sorted(groups.items()):
+    # The benchmark planner (RRTConnect) first, then the others.
+    order = sorted(groups.items(), key=lambda kv: (not kv[0][0].startswith("RRT"), kv[0]))
+    for (planner, constraint), rs in order:
         ok = [r for r in rs if r["success"] == "1"]
         times_ok = [float(r["planning_time_s"]) for r in ok]
         lo, hi = wilson(len(ok), len(rs))
@@ -312,7 +314,9 @@ EXTRA_SECTIONS = [
         "How RRTConnect's range was chosen (tuning set, not the evaluation set)",
         "20 queries generated with seed 1 (`results/tuning/queries_seed1.json`), disjoint from the "
         "seed-0 evaluation queries, orientation constraint only, four `range` settings. The best "
-        "success rate (ties: lower median time) became the benchmark planner configuration.",
+        "success rate (ties: lower median time) became the benchmark planner configuration."
+        " Run before 56ea7e9, when the benchmark node built its own octomap from the same camera "
+        "with identical settings (4747 voxels, the same count as move_group's map).",
         "`scripts/bench_planners.sh 20 results/tuning/tuning.csv "
         "results/tuning/queries_seed1.json results/tuning/tuning.yaml`",
     ),
@@ -320,7 +324,9 @@ EXTRA_SECTIONS = [
         "results/tuning/tuning_bitrrt.csv",
         "How BiTRRT's range was chosen (tuning set)",
         "Same protocol as for RRTConnect: the 20 seed-1 tuning queries, orientation constraint "
-        "only, three `range` settings; the highest success rate became the BiTRRT column.",
+        "only, three `range` settings; the highest success rate became the BiTRRT column."
+        " Run before 56ea7e9, when the benchmark node built its own octomap from the same camera "
+        "with identical settings (4747 voxels, the same count as move_group's map).",
         "`scripts/bench_planners.sh 20 results/tuning/tuning_bitrrt.csv "
         "results/tuning/queries_seed1.json results/tuning/tuning_bitrrt.yaml`",
     ),
@@ -347,7 +353,9 @@ EXTRA_SECTIONS = [
         "before `ValidateSolution` (0.1 rad blending), keep-upright reference yaw fixed at 0, OMPL "
         "seed 0. On the UR5e's 69 rad extent 0.005 means a collision check only every 0.35 rad; "
         "the unconstrained failures here are `ValidateSolution` rejections (error -2), not planner "
-        "timeouts.",
+        "timeouts."
+        " Run before 56ea7e9, when the benchmark node built its own octomap from the same camera "
+        "with identical settings (4747 voxels, the same count as move_group's map).",
         "`git checkout 2f08131 && scripts/bench_planners.sh 100 "
         "results/ablation/bench_lvsf0.005.csv`",
     ),

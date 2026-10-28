@@ -4,8 +4,9 @@
 
 ![Same shelf query planned without a constraint (left) and with the keep-upright constraint (right)](docs/assets/constrained_vs_unconstrained.gif)
 
-*One evaluation query (lowest id solved under both constraints within the median time),
-re-planned and executed in Gazebo, recorded by a simulated camera with headless rendering. The
+*One evaluation query (rule: the lowest id that crosses compartments and was solved under both
+constraints within the median time; here query 5, upper right to lower left), re-planned and
+executed in Gazebo, recorded by a simulated camera with headless rendering. The
 label is each path's measured max tool tilt. Played 15× slower than the time-optimal trajectory,
 shown at 3× ([scripts/record_gifs.sh](scripts/record_gifs.sh)).*
 
@@ -38,10 +39,12 @@ On another ROS distro, use the devcontainer or the `Dockerfile` (base `ros:lyric
 
 | Planner | Constraint | Success (95 % Wilson CI) | Planning time median / p95 (s) | Joint path median (rad) | TCP path median (m) | Max tool tilt median / worst (deg) | Executed path collision-free (dense check) |
 |---|---|---|---|---|---|---|---|
-| RRTConnect (range 2 rad) | none | 100/100 = 100 % (96 %–100 %) | 0.382 / 0.915 | 4.75 | 1.14 | 51.9 / 177.2 | 93/100 |
-| RRTConnect (range 2 rad) | orientation | 84/100 = 84 % (76 %–90 %) | 2.014 / 8.257 | 5.00 | 1.55 | 1.4 / 3.6 | 83/84 |
+| RRTConnect (range 2 rad) | none | 100/100 = 100 % (96 %–100 %) | 0.375 / 0.781 | 4.94 | 1.10 | 54.5 / 133.7 | 94/100 |
+| RRTConnect (range 2 rad) | orientation | 79/100 = 79 % (70 %–86 %) | 2.215 / 7.348 | 5.86 | 1.80 | 1.4 / 4.1 | 79/79 |
+| BiTRRT (range 2 rad) | none | 0/100 = 0 % (0 %–4 %) | – / – | – | – | – / – | not recorded |
+| BiTRRT (range 2 rad) | orientation | 83/100 = 83 % (74 %–89 %) | 2.195 / 8.591 | 5.34 | 1.47 | 1.3 / 4.3 | 82/83 |
 
-Source: `results/bench.csv` (200 rows, 100 queries, commit `8c81742`, query seed 0, OMPL seed 1, modes `constrained_state_space`, `joint_space`, 10 s per cell, octomap 4747 occupied 2 cm voxels, total wall time 7.7 min).
+Source: `results/bench.csv + results/bench_bitrrt.csv` (400 rows, 100 queries, commit `03af439`, query seed 0, OMPL seed 1, modes `constrained_state_space`, `joint_space`, 10 s per cell, octomap 4747 occupied 2 cm voxels, total wall time 8.2 min).
 
 <!-- results:end -->
 
@@ -58,6 +61,12 @@ is in [docs/architecture.md](docs/architecture.md).
   tool-down configurations, and the compartment openings are narrow passages of it. A MoveIt-side
   contributor I have not verified: the constrained validity checker re-checks the path constraint
   with exact tolerances, while OMPL's projection stops at a 1e-4 residual.
+- **BiTRRT is not a drop-in alternative here.** With its range chosen on the constrained tuning
+  queries (2 rad), BiTRRT matches RRTConnect on the keep-upright queries but solves none of the
+  unconstrained ones in 10 s (table above). My working explanation, not verified: BiTRRT only joins
+  its trees when they come within one `range` step in MoveIt's L1 joint metric, while in the
+  projected state space the re-projected steps meet more often. A range tuned on unconstrained
+  queries was not tried.
 - **It is very sensitive to RRTConnect's `range`.** OMPL's automatic range is 20 % of MoveIt's
   joint-space extent, which for the UR5e (±2π joints, extent = sum of ranges = 69 rad) is a
   13.8 rad step. On a separate tuning set it solved 1 of 20 constrained queries; range 2 rad solved
@@ -96,8 +105,11 @@ is in [docs/architecture.md](docs/architecture.md).
 - **Query generation avoids the hard edges.** Start/goal poses are sampled inside inset
   compartment regions with 3 cm clearance from the shelf, so IK failures at the shelf edges are
   not exercised (the generator's counters are in `results/queries.json`).
-- **Not bit-reproducible.** Queries are byte-identical from the seed (tested); plans are not,
-  because OMPL stops on wall-clock time. Seeds and the commit hash are stamped on every row.
+- **Not bit-reproducible, and one repetition.** Queries are byte-identical from the seed (tested);
+  plans are not, because OMPL stops on wall-clock time. An earlier run of an equivalent
+  configuration (commit c62bc8d's `results/bench.csv`) solved 84 instead of 79 keep-upright
+  queries: within the Wilson intervals, but a reminder that one repetition per cell is thin. Seeds
+  and the commit hash are stamped on every row.
 - **MoveIt 2.15.2's `~MoveItCpp` segfaults on shutdown** in this setup; the node writes its
   outputs and exits with `_Exit` instead.
 - **CI has not run yet** (GitHub Actions is blocked on the account); the same steps were run
