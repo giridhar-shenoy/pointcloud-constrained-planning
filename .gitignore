@@ -14,3 +14,5 @@ datasets/
 results/plots/
 results/tmp/
 *.bag
+*.partial
+*.partial.meta.json

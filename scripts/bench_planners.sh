@@ -24,8 +24,18 @@ if ! "${GIT[@]}" diff --quiet HEAD -- src results/queries.json; then
 fi
 mkdir -p "$(dirname "${OUT}")"
 start=$(date +%s)
+# Write to <OUT>.partial and rename at the end: a git operation that rewrites a tracked file
+# (pre-commit's stash during a commit did) must never swap the file under the running node.
+PARTIAL="${REPO}/${OUT}.partial"
+rm -f "${PARTIAL}" "${PARTIAL}.meta.json"
 "${REPO}/scripts/with_sim.sh" ros2 launch pcp_benchmark benchmark.launch.py \
-  queries_file:="${REPO}/${QUERIES}" output_csv:="${REPO}/${OUT}" "${EXTRA[@]}" \
+  queries_file:="${REPO}/${QUERIES}" output_csv:="${PARTIAL}" "${EXTRA[@]}" \
   commit:="${COMMIT}" max_queries:="${N}" ompl_log_level:="${PCP_OMPL_LOG_LEVEL:-info}"
+if [ ! -f "${PARTIAL}.meta.json" ]; then
+  echo "[bench_planners] benchmark did not finish (no ${PARTIAL}.meta.json); ${OUT} left unchanged" >&2
+  exit 1
+fi
+mv "${PARTIAL}" "${REPO}/${OUT}"
+mv "${PARTIAL}.meta.json" "${REPO}/${OUT}.meta.json"
 rows=$(($(wc -l <"${OUT}") - 1))
 echo "[bench_planners] ${rows} rows in ${OUT} (commit ${COMMIT}) in $(( $(date +%s) - start )) s"
