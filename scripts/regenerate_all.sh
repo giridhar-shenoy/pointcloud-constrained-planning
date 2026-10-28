@@ -44,6 +44,8 @@ lock gazebo scripts/ci_smoke.sh
 # Tuning set (seed 1): how RRTConnect's range was chosen.
 lock gazebo scripts/bench_planners.sh 20 results/tuning/tuning.csv \
   results/tuning/queries_seed1.json results/tuning/tuning.yaml
+lock gazebo scripts/bench_planners.sh 20 results/tuning/tuning_bitrrt.csv \
+  results/tuning/queries_seed1.json results/tuning/tuning_bitrrt.yaml
 # Evaluation set (seed 0): the README table, BiTRRT column, octomap resolution sweep.
 lock gazebo scripts/bench_planners.sh 100 results/bench.csv
 lock gazebo scripts/bench_planners.sh 100 results/bench_bitrrt.csv results/queries.json \

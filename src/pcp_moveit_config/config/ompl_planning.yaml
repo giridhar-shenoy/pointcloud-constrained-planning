@@ -39,11 +39,28 @@ planner_configs:
   RRTConnectRange2:
     type: geometric::RRTConnect
     range: 2.0
-  # SHOULD item: BiTRRT column. MoveIt Setup Assistant defaults except range, which uses the
-  # value chosen for RRTConnect on the tuning set (parity, not separately tuned).
+  # SHOULD item: BiTRRT column. MoveIt Setup Assistant defaults; range chosen on the seed-1
+  # tuning set like RRTConnect's (BiTRRT only joins its trees when they are within one `range`
+  # step, so RRTConnect's 2 rad is not a neutral choice for it).
+  BiTRRTkConfigDefault:
+    type: geometric::BiTRRT
+    range: 0.0
+    temp_change_factor: 0.1
+    init_temperature: 100.0
+    frontier_threshold: 0.0
+    frontier_node_ratio: 0.1
+    cost_threshold: 1.0e+300
   BiTRRTRange2:
     type: geometric::BiTRRT
     range: 2.0
+    temp_change_factor: 0.1
+    init_temperature: 100.0
+    frontier_threshold: 0.0
+    frontier_node_ratio: 0.1
+    cost_threshold: 1.0e+300
+  BiTRRTRange6:
+    type: geometric::BiTRRT
+    range: 6.0
     temp_change_factor: 0.1
     init_temperature: 100.0
     frontier_threshold: 0.0
@@ -57,7 +74,9 @@ ur_manipulator:
     - RRTConnectRange0_5
     - RRTConnectRange1
     - RRTConnectRange2
+    - BiTRRTkConfigDefault
     - BiTRRTRange2
+    - BiTRRTRange6
   # With path constraints present, plan in OMPL's ProjectedStateSpace (samples are projected
   # onto the constraint manifold) instead of rejection-sampling joint space. Requests without
   # path constraints still use the ordinary joint-space state space.
