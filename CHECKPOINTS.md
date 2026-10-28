@@ -309,3 +309,37 @@ On branch feat/direct-pipeline; nothing to commit, working tree clean
 - Left: the whole v0.2 MUST list (collision module → agreement → planner → traj → exec → bench →
   docs → CI → merge).
 - Does Sunday 1 Nov hold? Yes, if the dry run projects ≤ 75 min tonight.
+
+## v0.2 CHECKPOINT 2 — collision module, agreement (2026-10-29 03:25 IST, overnight mode)
+
+```text
+$ build/pcp_direct/test_collision
+[==========] 8 tests from 1 test suite ran.
+[  PASSED  ] 8 tests.
+  LoadsTheSevenShelfBoxes, JointBoundsMatchMoveIt, SrdfRemovesTheDisabledGeometryPairs (7),
+  ActivePairsAreExactlyThePairsMoveItChecks (62 = 62), HomeConfigurationIsFree,
+  FoldedElbowSelfCollides, ToolInsideTheMiddleBoardCollidesWithIt, IsValidCountsAndTimesCalls
+$ colcon test --packages-select pcp_benchmark pcp_direct && colcon test-result
+Summary: 31 tests, 0 errors, 0 failures, 0 skipped
+$ flock heavy flock build flock gazebo scripts/collision_agreement.sh 500 results/collision_agreement.csv 0
+[collision_agreement] 500/500 agree (100.00 %), boundary 180/194, pair sets equal True, commit 374b246
+  agreement 500/500 = 100.00 % (MoveIt colliding 343, direct colliding 343);
+  median check MoveIt 48.9 us, direct 61.2 us   (both incl. forward kinematics)
+  boundary probe: 180/194 brackets agree (92.78 %)
+```
+
+**Agreement % (the item to show Giri): 100.00 % (500/500).** Detail:
+
+- Both checkers name the identical pair list on all 500 configurations, and on the 157 free ones
+  their minimum distances are equal to the 1e-6 m printed (FCL in MoveIt vs coal through
+  Pinocchio; coal is a fork of FCL via hpp-fcl, so the two share algorithms).
+- Uniform samples never come closer than 5.4 mm to contact, so a supplementary boundary probe
+  bisects every verdict change between consecutive samples to a 1e-7 rad bracket: 180/194 agree.
+  All 14 differences are the same mesh pair, forearm_link/wrist_3_link, where FCL measures
+  1–5 nm of separation and coal says "contact". That is 200–1000× below coal's GJK tolerance
+  (1e-6 m) and below Pinocchio's `distance_upper_bound` (1e-6 m). Nothing was tuned.
+- MoveIt is faster per check (48.9 vs 61.2 µs median); see NOTES.md for what each includes.
+
+Files: `results/collision_agreement.csv` (+ `.meta.json`), `results/collision_agreement_boundary.csv`
+(commit 4412768). Wall-clock this checkpoint: ≈ 50 min. Left: planner, traj, exec, bench, docs,
+CI, merge. 1 Nov holds.

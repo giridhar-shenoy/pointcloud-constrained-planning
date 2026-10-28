@@ -50,6 +50,13 @@ runs after the fixes (tuning and ablation note that they predate the octomap wir
    projected states, and a `range` sweep above 2 rad on the tuning set; then BiTRRT's 0/100
    unconstrained.
 
+## v0.2 CHECKPOINT 2 RESULT — collision agreement (you asked to see this before continuing)
+
+**500/500 = 100 %** of seeded uniform configurations get the same verdict from MoveIt (FCL) and the
+direct checker (coal through Pinocchio), with identical pair lists; boundary probe 180/194, all 14
+differences on forearm_link/wrist_3_link at 1–5 nm separation (below coal's 1e-6 m GJK tolerance).
+Details: CHECKPOINTS.md "v0.2 CHECKPOINT 2". Work continued per the overnight rules.
+
 ## WAITING FOR GIRI
 
 ### v0.2 (29 Oct night) — decisions taken on my recommendation, please confirm
