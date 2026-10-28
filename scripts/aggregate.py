@@ -315,7 +315,7 @@ EXTRA_SECTIONS = [
         "20 queries generated with seed 1 (`results/tuning/queries_seed1.json`), disjoint from the "
         "seed-0 evaluation queries, orientation constraint only, four `range` settings. The best "
         "success rate (ties: lower median time) became the benchmark planner configuration."
-        " Run before 56ea7e9, when the benchmark node built its own octomap from the same camera "
+        " Run before db74fcc, when the benchmark node built its own octomap from the same camera "
         "with identical settings (4747 voxels, the same count as move_group's map).",
         "`scripts/bench_planners.sh 20 results/tuning/tuning.csv "
         "results/tuning/queries_seed1.json results/tuning/tuning.yaml`",
@@ -325,7 +325,7 @@ EXTRA_SECTIONS = [
         "How BiTRRT's range was chosen (tuning set)",
         "Same protocol as for RRTConnect: the 20 seed-1 tuning queries, orientation constraint "
         "only, three `range` settings; the highest success rate became the BiTRRT column."
-        " Run before 56ea7e9, when the benchmark node built its own octomap from the same camera "
+        " Run before db74fcc, when the benchmark node built its own octomap from the same camera "
         "with identical settings (4747 voxels, the same count as move_group's map).",
         "`scripts/bench_planners.sh 20 results/tuning/tuning_bitrrt.csv "
         "results/tuning/queries_seed1.json results/tuning/tuning_bitrrt.yaml`",
@@ -354,9 +354,9 @@ EXTRA_SECTIONS = [
         "seed 0. On the UR5e's 69 rad extent 0.005 means a collision check only every 0.35 rad; "
         "the unconstrained failures here are `ValidateSolution` rejections (error -2), not planner "
         "timeouts."
-        " Run before 56ea7e9, when the benchmark node built its own octomap from the same camera "
+        " Run before db74fcc, when the benchmark node built its own octomap from the same camera "
         "with identical settings (4747 voxels, the same count as move_group's map).",
-        "`git checkout 2f08131 && scripts/bench_planners.sh 100 "
+        "`git checkout 6c12eeb && scripts/bench_planners.sh 100 "
         "results/ablation/bench_lvsf0.005.csv`",
     ),
 ]
