@@ -56,7 +56,12 @@ flowchart LR
 
 - **One octomap owner.** `move_group` runs the only `PointCloudOctomapUpdater`; the benchmark node
   receives the map through `/monitored_planning_scene`. RViz, the smoke test and the benchmark
-  therefore see the same map, and the CPU pays for one updater.
+  therefore see the same map, and the CPU pays for one updater. This needs care: MoveItCpp's
+  planning-scene monitor starts a world-geometry monitor of its own, so if the benchmark node is
+  given the `sensors_3d` parameters it silently builds a second octomap from the same camera.
+  It was, until a 5 cm resolution sweep recorded a 2 cm octree in the benchmark's snapshot;
+  `benchmark.launch.py` now strips those parameters, and every run records the snapshot's octree
+  resolution in its `.meta.json`.
 - **Frozen snapshot.** The benchmark waits until the number of occupied voxels has not changed for
   3 s, clones the planning scene once, and passes that clone to every
   `PlanningComponent::plan(params, scene)` call. All 200 cells see the identical map, so differences

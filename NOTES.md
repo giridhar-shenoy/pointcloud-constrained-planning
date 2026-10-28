@@ -185,3 +185,17 @@ stopped and re-queued after the fixes, so tuning uses the final pipeline.
 - Mermaid diagram in docs/architecture.md not render-checked (npx was not allowed).
 - VS Code extension id `ms-iot.vscode-ros` in devcontainer.json not checked against the
   marketplace (that extension is deprecated upstream).
+
+### SHOULD runs and the second-octomap bug (05:46–06:35)
+
+- First sweep/BiTRRT chain finished 06:27. The 5 cm sweep's snapshot recorded a **2 cm** octree:
+  MoveItCpp's planning-scene monitor starts a world-geometry monitor, and the benchmark node had
+  been given `sensors_3d`, so it ran its own PointCloudOctomapUpdater at 2 cm. Fixed in a2441cd
+  (sensor/octomap params stripped from the benchmark node). Before the fix both updaters used the
+  same camera and settings (4747 voxels either way), so tuning results are kept; the evaluation,
+  BiTRRT column and sweep are re-run after the fix.
+- BiTRRT tuning (seed 1, orientation): auto 13/20, 2 rad 14/20, 6 rad 9/20 → BiTRRTRange2.
+  Pre-fix BiTRRT evaluation: none 0/100, orientation 77/100. Hypothesis for 0/100 unconstrained:
+  BiTRRT joins its trees only within one `range` step of the L1 joint metric; in the projected
+  space steps are re-projected and connections happen more often. Not verified.
+- I stopped my own BiTRRT run once (05:45) to let R1 run its final smoke test first.
