@@ -5,7 +5,7 @@ All planner parameters live in
 the benchmark node sets only the request-level values listed at the end of this page, from
 [`src/pcp_benchmark/config/benchmark.yaml`](../src/pcp_benchmark/config/benchmark.yaml).
 
-## RRTConnect (the only planner in v0.1)
+## RRTConnect (the benchmark planner)
 
 RRTConnect [Kuffner & LaValle 2000] grows two rapidly-exploring random trees, one from the start and
 one from the goal, and after every extension tries to connect them greedily with straight-line
@@ -24,7 +24,19 @@ singularities or in narrow passages of the manifold — the dominant cause of th
 failures in [results.md](results.md). Without path constraints the same request uses the ordinary
 joint-space state space.
 
-BiTRRT (second column) is a SHOULD item and is not in v0.1.
+## BiTRRT (second column, SHOULD item)
+
+BiTRRT [Devaurs, Siméon & Cortés 2013] is the bidirectional version of Transition-based RRT: two
+trees grow as in RRT, but each extension must pass a *transition test* that accepts a move to a
+costlier state only with a probability set by a self-adjusting temperature, which makes the trees
+follow valleys of a cost map. Two properties matter here. First, the trees are joined only when a
+new node of one tree is within a single `range` step of the other tree; RRTConnect instead walks
+greedily towards the other tree until it is blocked. Second, with MoveIt's default objective there
+is no meaningful state cost, so the transition test mostly adds rejections without guidance. Both
+predict that BiTRRT needs many more nodes than RRTConnect to close the gap, and in the projected
+state space each node costs a projection. The first attempt reused RRTConnect's 2 rad range and
+timed out on every unconstrained query it reached; BiTRRT's range is therefore chosen on the
+tuning set by the same rule (results.md), and the evaluation numbers are in results.md.
 
 ## Keep-upright orientation constraint
 
@@ -97,6 +109,8 @@ was not used to choose it. Table: [results.md](results.md#how-rrtconnects-range-
 
 - J. J. Kuffner and S. M. LaValle, "RRT-Connect: An efficient approach to single-query path
   planning," ICRA 2000.
+- D. Devaurs, T. Siméon and J. Cortés, "Enhancing the transition-based RRT to deal with complex
+  cost spaces," ICRA 2013.
 - Z. Kingston, M. Moll and L. E. Kavraki, "Exploring implicit spaces for constrained
   sampling-based planning," IJRR 38(10–11), 2019.
 - I. A. Şucan, M. Moll and L. E. Kavraki, "The Open Motion Planning Library," IEEE RAM 19(4), 2012.
