@@ -44,6 +44,13 @@ target_link_libraries(pcp_direct_collision PUBLIC
   Eigen3::Eigen
   yaml-cpp::yaml-cpp)
 
+add_library(pcp_direct_planner src/planner.cpp)
+target_link_libraries(pcp_direct_planner PUBLIC pcp_direct_collision ompl::ompl yaml-cpp::yaml-cpp)
+
+add_library(pcp_direct_traj src/traj.cpp)
+target_link_libraries(pcp_direct_traj PUBLIC
+  pcp_direct_planner ${trajectory_msgs_TARGETS} yaml-cpp::yaml-cpp)
+
 # ---- MoveIt reference side ----------------------------------------------------------------------
 # Shelf boxes -> moveit_msgs/CollisionObject for MoveIt's planning-scene monitor.
 add_executable(shelf_boxes_loader src/shelf_boxes_loader_main.cpp)
@@ -60,7 +67,7 @@ target_link_libraries(collision_agreement
   moveit_ros_planning::moveit_planning_scene_monitor
   nlohmann_json::nlohmann_json)
 
-install(TARGETS pcp_direct_collision
+install(TARGETS pcp_direct_collision pcp_direct_planner pcp_direct_traj
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})
@@ -84,14 +91,20 @@ if(BUILD_TESTING)
   set(TEST_DEFS
     PCP_TEST_URDF="${TEST_URDF}"
     PCP_TEST_SRDF="${TEST_SRDF}"
-    PCP_SHELF_YAML="${CMAKE_CURRENT_SOURCE_DIR}/../pcp_scenes/config/shelf.yaml")
+    PCP_SHELF_YAML="${CMAKE_CURRENT_SOURCE_DIR}/../pcp_scenes/config/shelf.yaml"
+    PCP_OMPL_YAML="${CMAKE_CURRENT_SOURCE_DIR}/../pcp_moveit_config/config/ompl_planning.yaml"
+    PCP_JOINT_LIMITS_YAML="${CMAKE_CURRENT_SOURCE_DIR}/config/joint_limits.yaml"
+    PCP_COMMITTED_BOX_QUERIES="${CMAKE_CURRENT_SOURCE_DIR}/../../results/queries_boxes.json")
 
-  ament_add_gtest(test_collision test/test_collision.cpp TIMEOUT 300)
-  target_link_libraries(test_collision pcp_direct_collision pcp_benchmark::pcp_benchmark_core)
-  target_compile_definitions(test_collision PRIVATE ${TEST_DEFS})
-  add_dependencies(test_collision pcp_direct_test_robot_files)
+  foreach(t test_collision test_planner test_traj test_queries_boxes)
+    ament_add_gtest(${t} test/${t}.cpp TIMEOUT 300)
+    target_link_libraries(${t} pcp_direct_traj pcp_benchmark::pcp_benchmark_core
+      ament_index_cpp::ament_index_cpp)
+    target_compile_definitions(${t} PRIVATE ${TEST_DEFS})
+    add_dependencies(${t} pcp_direct_test_robot_files)
+  endforeach()
 endif()
 
 ament_export_include_directories(include)
-ament_export_libraries(pcp_direct_collision)
+ament_export_libraries(pcp_direct_collision pcp_direct_planner pcp_direct_traj)
 ament_package()
