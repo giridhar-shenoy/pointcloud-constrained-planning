@@ -22,6 +22,13 @@ find_package(sensor_msgs REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(moveit_core REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
+# moveit_planners_ompl 2.15.2's exported target lists a non-existent include directory
+# (include/moveit_planners_ompl; the headers are in include/moveit_planners), which fails CMake's
+# generate step. bench_direct only needs ModelBasedPlanningContext to read MoveIt's configured
+# OMPL settings, so the library and header directory are found directly.
+find_library(MOVEIT_OMPL_INTERFACE_LIBRARY moveit_ompl_interface REQUIRED)
+find_path(MOVEIT_OMPL_INTERFACE_INCLUDE_DIR moveit/ompl_interface/model_based_planning_context.hpp
+  PATH_SUFFIXES moveit_planners REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -51,6 +58,14 @@ add_library(pcp_direct_traj src/traj.cpp)
 target_link_libraries(pcp_direct_traj PUBLIC
   pcp_direct_planner ${trajectory_msgs_TARGETS} yaml-cpp::yaml-cpp)
 
+add_library(pcp_direct_exec src/exec.cpp)
+target_include_directories(pcp_direct_exec PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_link_libraries(pcp_direct_exec PUBLIC
+  rclcpp::rclcpp rclcpp_action::rclcpp_action ${control_msgs_TARGETS} ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS})
+
 # ---- MoveIt reference side ----------------------------------------------------------------------
 # Shelf boxes -> moveit_msgs/CollisionObject for MoveIt's planning-scene monitor.
 add_executable(shelf_boxes_loader src/shelf_boxes_loader_main.cpp)
@@ -67,11 +82,25 @@ target_link_libraries(collision_agreement
   moveit_ros_planning::moveit_planning_scene_monitor
   nlohmann_json::nlohmann_json)
 
-install(TARGETS pcp_direct_collision pcp_direct_planner pcp_direct_traj
+# Both pipelines on the same queries, scene and controller.
+add_executable(bench_direct src/bench_direct_main.cpp)
+target_link_libraries(bench_direct
+  pcp_direct_traj
+  pcp_direct_exec
+  pcp_benchmark::pcp_benchmark_core
+  ${MOVEIT_OMPL_INTERFACE_LIBRARY}
+  rclcpp::rclcpp
+  moveit_ros_planning::moveit_cpp
+  moveit_ros_planning::moveit_planning_scene_monitor
+  nlohmann_json::nlohmann_json)
+
+target_include_directories(bench_direct PRIVATE ${MOVEIT_OMPL_INTERFACE_INCLUDE_DIR})
+
+install(TARGETS pcp_direct_collision pcp_direct_planner pcp_direct_traj pcp_direct_exec
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})
-install(TARGETS shelf_boxes_loader collision_agreement RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(TARGETS shelf_boxes_loader collision_agreement bench_direct RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
@@ -106,5 +135,5 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_include_directories(include)
-ament_export_libraries(pcp_direct_collision pcp_direct_planner pcp_direct_traj)
+ament_export_libraries(pcp_direct_collision pcp_direct_planner pcp_direct_traj pcp_direct_exec)
 ament_package()

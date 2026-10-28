@@ -1,0 +1,19 @@
+# bench_direct parameters (v0.2). Planner settings are NOT here: the direct planner reads the
+# same pcp_moveit_config/config/ompl_planning.yaml that MoveIt loads (and checks they match).
+/**:
+  ros__parameters:
+    bench:
+      group: ur_manipulator
+      tip_link: tool0
+      pipeline: ompl
+      planning_time: 10.0     # s, both pipelines (MoveIt: allowed_planning_time)
+      ompl_seed: 1            # OMPL replaces 0 by 1; seeds the direct planner only
+      sample_dt: 0.1          # s, trapezoid sampling step (MoveIt's TOTG resample_dt is 0.1 s)
+      goal_tolerance: 0.01    # rad, "reached the goal" and "at the start" (= MoveIt's start tolerance)
+      dense_step: 0.01        # rad, cross-validation / dense re-check step (as v0.1)
+      exec_timeout_margin: 30.0
+      scene_timeout: 60.0
+      action_name: /joint_trajectory_controller/follow_joint_trajectory
+      controller_state_topic: /joint_trajectory_controller/controller_state
+    planning_pipelines:
+      pipeline_names: [ompl]
