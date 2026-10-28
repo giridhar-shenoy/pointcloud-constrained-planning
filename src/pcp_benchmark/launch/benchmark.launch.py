@@ -12,7 +12,7 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
-from pcp_moveit_config import build_moveit_config, octomap_params
+from pcp_moveit_config import build_moveit_config
 
 
 def generate_launch_description():
@@ -31,6 +31,14 @@ def generate_launch_description():
         "ompl_log_level": "info",
     }
     moveit_config = build_moveit_config()
+    # No sensors_3d / octomap parameters for this node: MoveItCpp's planning-scene monitor starts a
+    # world-geometry monitor, and with sensor parameters present it would run a SECOND
+    # PointCloudOctomapUpdater on /camera/points (it did, until this was found by a resolution
+    # sweep whose 5 cm move_group map never reached the benchmark). The octomap must come only from
+    # move_group via /monitored_planning_scene.
+    moveit_params = {
+        k: v for k, v in moveit_config.to_dict().items() if k not in ("sensors", "camera_points")
+    }
     bench = Node(
         package="pcp_benchmark",
         executable="pcp_benchmark",
@@ -46,8 +54,7 @@ def generate_launch_description():
             ],
         ],
         parameters=[
-            moveit_config.to_dict(),
-            octomap_params(),
+            moveit_params,
             PathJoinSubstitution([FindPackageShare("pcp_benchmark"), "config", "benchmark.yaml"]),
             LaunchConfiguration("extra_params"),
             {
