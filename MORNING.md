@@ -52,6 +52,32 @@ runs after the fixes (tuning and ablation note that they predate the octomap wir
 
 ## WAITING FOR GIRI
 
+### v0.2 (29 Oct night) — decisions taken on my recommendation, please confirm
+
+- **D1–D5** (NOTES.md, Session 2 plan): reuse `pcp_scenes/config/shelf.yaml` as the one box file;
+  an L1 joint metric/extent in the direct OMPL space to match MoveIt's; `queries_boxes.json`
+  identical to `queries.json` (the v0.1 generator already sampled against the boxes); velocity
+  π rad/s and acceleration 5 rad/s² for both parameterisers (the JTC config has no limits); v0.1
+  `sim.launch.py` unchanged with move_group idle in the background. Work proceeds on these; if
+  you disagree, D2 and D4 change benchmark numbers, the others do not.
+
+### v0.2 — open items that need you
+
+- **README on main says "CI has not run yet"**, which is false since run 40649038811. Fix that
+  bullet on main now (docs commit) or let the v0.2 merge carry the fix? Recommendation: let the
+  merge carry it; if the merge is deferred, approve a one-line fix on main.
+- **Perceptyne L3 phrase**: no application notes are in the repo, so the README row stays
+  `TODO(Giri)`. Paste the phrase.
+- **Branch protection on main** (not set; repo settings were not touched) and **GitHub Actions on
+  Node.js 20** (`checkout@v4`, `setup-python@v5`, `cache@v4`, `build-push-action@v6`,
+  `setup-buildx-action@v3`; the runner forces Node 24 and warns). Recommendation: protection
+  requiring the CI check, and bump the actions when GitHub stops forcing.
+
+### v0.1 items (28 Oct)
+
+Items 1 (billing) and 4 (git-lfs bag) are resolved: the repo is public, CI runs, and the runner
+renders the depth camera (run 40649038811). Items 2 and 3 are still open.
+
 ### 1. GitHub Actions will not start on this private repo (billing)
 
 - **What:** every CI run on `giridhar-shenoy/pointcloud-constrained-planning` ends in ~3 s with the
