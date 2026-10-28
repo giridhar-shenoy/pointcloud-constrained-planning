@@ -85,12 +85,14 @@ int main(int argc, char ** argv)
     int64_t seed = 0;
     std::string group = "ur_manipulator";
     double scene_timeout = 60.0;
+    std::string commit = "unknown";
     node->get_parameter("agree.shelf_yaml", shelf_yaml);
     node->get_parameter("agree.output_csv", output_csv);
     node->get_parameter("agree.count", count);
     node->get_parameter("agree.seed", seed);
     node->get_parameter("agree.group", group);
     node->get_parameter("agree.scene_timeout_s", scene_timeout);
+    node->get_parameter("agree.commit", commit);
     if (shelf_yaml.empty() || output_csv.empty()) {
       throw std::runtime_error("agree.shelf_yaml and agree.output_csv are required");
     }
@@ -317,6 +319,7 @@ int main(int argc, char ** argv)
       median(direct_us));
 
     const nlohmann::json meta = {
+      {"commit", commit},
       {"count", count},
       {"seed", seed},
       {"group", group},
