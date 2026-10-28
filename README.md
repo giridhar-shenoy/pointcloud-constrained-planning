@@ -85,10 +85,12 @@ is in [docs/architecture.md](docs/architecture.md).
   more than 5°. With a fixed reference it would drop to ≈ 2.25° for a tool yawed by 180°.
 - **Unconstrained paths would spill the cup.** Without the constraint the tool tilts far from
   vertical on the way (max-tilt column), even though start and goal are both tool-down.
+- **Coarser octomaps break queries before they speed planning up.** 2 cm was chosen from the
+  thinnest obstacle (2 cm boards). In the 2 cm vs 5 cm sweep (first 20 queries, docs/results.md)
+  5 cm voxels put half of the queries' start or goal states in collision, because one voxel
+  swallows the generator's 3 cm clearance, while unconstrained planning time barely changes.
 - **One fixed camera.** Occluded space is unknown, and MoveIt treats unknown as free: the back
-  corners of the compartments behind the boards are not in the map. The 2 cm resolution was
-  chosen from the thinnest obstacle (2 cm boards); the resolution vs planning-time trade-off is
-  not measured yet.
+  corners of the compartments behind the boards are not in the map.
 - **No sensor noise.** The Gazebo depth camera is noise-free; a real camera's speckle and edge
   artefacts would add phantom voxels next to the shelf.
 - **Query generation avoids the hard edges.** Start/goal poses are sampled inside inset
