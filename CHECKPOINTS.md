@@ -276,3 +276,36 @@ Only CI-green (billing) and the Perceptyne phrase. Both need Giri.
 ### Does 1 Nov hold?
 
 Yes: code, results and docs are done; 1 Nov needs only the two decisions in MORNING.md.
+
+## v0.2 CHECKPOINT 1 — CI green on main; branch created (2026-10-29 02:37 IST, overnight mode)
+
+Giri went to sleep before answering; per the overnight rules this report is logged and work
+continues. Items that needed his answer are under WAITING FOR GIRI in MORNING.md.
+
+```text
+$ gh repo view --json visibility --jq .visibility
+PUBLIC
+$ gh run view 40649038811 --json status,conclusion,headSha    # first run that started, b587d57
+completed success b587d57720a2a5dd17d1d90525f48ba9a1beb9ea
+  colcon test-result: Summary: 22 tests, 0 errors, 0 failures, 0 skipped
+  [smoke] octomap OK: 237755 bytes, resolution 0.02 m, frame 'world', after 7.9 s   (GitHub runner, Mesa)
+  [ci_smoke] PASS in 16 s; mini-benchmark 10 rows
+$ gh run view 40767818396 ...   # main 30677c4 (Step 0 notes)
+completed success; Summary: 22 tests, 0 errors, 0 failures, 0 skipped; [ci_smoke] PASS in 13 s;
+[bench_planners] 10 rows in results/tmp/ci_bench5.csv (commit 30677c4) in 26 s
+$ gh run view 40767886104 ...   # feat/direct-pipeline dd5333a (plan)
+completed success
+$ git branch -vv
+* feat/direct-pipeline dd5333a [origin/feat/direct-pipeline] docs: plan the v0.2 direct OMPL + Pinocchio/coal pipeline
+  main                 30677c4 [origin/main] docs: record the first CI run on main (green, no fixes needed)
+$ git status
+On branch feat/direct-pipeline; nothing to commit, working tree clean
+```
+
+- Step 0 needed no Dockerfile or ci.yml fix (NOTES.md, "Session 2 … Step 0").
+- Plan + decisions D1–D5 in NOTES.md (branch); source facts from the research sub-agent recorded
+  (fe1c03b). D1–D5 proceed on the recommendation; listed in MORNING.md for confirmation.
+- Wall-clock so far: ≈ 1 h (CI watch, reading v0.1, research, plan).
+- Left: the whole v0.2 MUST list (collision module → agreement → planner → traj → exec → bench →
+  docs → CI → merge).
+- Does Sunday 1 Nov hold? Yes, if the dry run projects ≤ 75 min tonight.
