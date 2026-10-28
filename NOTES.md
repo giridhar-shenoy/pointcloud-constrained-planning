@@ -204,3 +204,10 @@ stopped and re-queued after the fixes, so tuning uses the final pipeline.
   pointed its publisher at move_group's topic. Fixed (56ea7e9): `planning_scene` →
   `/monitored_planning_scene`. 2-query check: snapshot = move_group's map, 4747 voxels at 2 cm, the
   same count as the old self-built map. Re-running sweep, evaluation and BiTRRT after this fix.
+- 06:51–06:59 **lost run (my fault):** the post-fix evaluation wrote `results/bench.csv`, a tracked
+  file, while I committed the sweep. pre-commit stashes unstaged changes by checking tracked files
+  out and restoring them, which replaced the file under the running node; its later rows went to
+  the unlinked inode (CSV ended with 1 row, the node had run all 200 cells in 7.9 min). Rules from
+  now on: no commits while a benchmark writes; evaluation re-run goes to `results/tmp/` and is
+  moved into place afterwards; `bench_planners.sh` will write a `.partial` file and rename it
+  (changed only after the running BiTRRT job finishes, because bash reads scripts while running).
