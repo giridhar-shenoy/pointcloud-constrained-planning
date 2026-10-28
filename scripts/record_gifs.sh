@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Record docs/assets/constrained_vs_unconstrained.gif from Gazebo (headless rendering, no RViz).
 #
-# Query choice is mechanical, not hand-picked: the lowest query id in results/bench.csv that was
-# solved both without a constraint and with the keep-upright constraint, with the constrained cell
-# solved within the median constrained planning time (so the re-plan reliably succeeds; query 0
-# took 7.6 s in the benchmark and failed three re-plans). That query is re-planned
+# Query choice is mechanical, not hand-picked: the lowest query id in results/bench.csv whose start
+# and goal lie in different compartments (the GIF must show a path through the shelf; a
+# same-compartment query showed 0 deg tilt either way), that was solved both without a constraint
+# and with the keep-upright constraint, with the constrained cell solved within the median
+# constrained planning time (so the re-plan reliably succeeds; a 7.6 s query failed three
+# re-plans). The tilt is never looked at. That query is re-planned
 # once per constraint by the C++ benchmark node (trajectories saved as JSON), then both
 # trajectories are executed in Gazebo while a demo camera records, and ffmpeg stacks them.
 # Re-planning means the GIF shows *a* solution of that query, not the benchmark cell's exact path.
@@ -34,8 +36,9 @@ for r in rows:
     ok.setdefault(int(r["query_id"]), set())
     if r["success"] == "1":
         ok[int(r["query_id"])].add(r["constraint"])
+cross = {int(r["query_id"]) for r in rows if r["start_region"] != r["goal_region"]}
 both = [q for q, s in sorted(ok.items())
-        if {"none", "orientation"} <= s and t_ori[q] <= median]
+        if q in cross and {"none", "orientation"} <= s and t_ori[q] <= median]
 print(both[0] if both else -1)
 PY
 )
