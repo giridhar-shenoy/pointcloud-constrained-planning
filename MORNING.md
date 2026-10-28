@@ -4,29 +4,29 @@
 
 **Done (MUST list), all local, all committed and pushed to the private repo:**
 
-- Skeleton, Dockerfile (`ros:lyrical-ros-base`), devcontainer, CI workflow, pre-commit — e47c849, CI fix 8c41f37.
+- Skeleton, Dockerfile (`ros:lyrical-ros-base`), devcontainer, CI workflow, pre-commit — bfd430e, CI fix dfb0119.
 - Headless sim: UR5e + Gazebo `rgbd_camera` → `/camera/points` → move_group octomap (2 cm) in
   `/monitored_planning_scene`; `scripts/ci_smoke.sh` passes in 16 s and also proves the octomap is
-  in collision checking — ac65c0b.
+  in collision checking — 32530ab.
 - C++ benchmark node (MoveItCpp): keep-upright constraint builder, deterministic seeded query
   generator (`results/queries.json`, byte-for-byte regeneration test), runner on a frozen snapshot
   of move_group's map, metrics incl. max tilt and a dense collision re-check; 22 gtests/pytests
-  pass — 7e3488a, fixes 89533bb, a2441cd, 56ea7e9.
-- Results (f44225f), all tables from `scripts/aggregate.py`:
+  pass — c84969c, fixes ca8deb5, 2951a4c, db74fcc.
+- Results (8129897), all tables from `scripts/aggregate.py`:
   - RRTConnect (range 2 rad): unconstrained 100/100, keep-upright **79/100** (Wilson 70–86 %),
     median 2.2 s, worst tilt 4.1°, 8.2 min for 200 cells.
   - BiTRRT (SHOULD): unconstrained 0/100, keep-upright 83/100.
-  - `range` chosen on a separate seed-1 tuning set, never on the evaluation queries (8c81742).
+  - `range` chosen on a separate seed-1 tuning set, never on the evaluation queries (e3a1945).
   - Ablation of MoveIt's usual `longest_valid_segment_fraction` 0.005 (69 rad extent → check every
-    0.35 rad → 17 % of unconstrained plans invalid), fixed in d7027c0.
-  - Octomap sweep (SHOULD): at 5 cm half the queries start/end in collision (4345452).
-- GIF `docs/assets/constrained_vs_unconstrained.gif` from Gazebo (no RViz): query 5, tilt 29° vs 1° — c0bf4f6.
+    0.35 rad → 17 % of unconstrained plans invalid), fixed in ee95adb.
+  - Octomap sweep (SHOULD): at 5 cm half the queries start/end in collision (a46137f).
+- GIF `docs/assets/constrained_vs_unconstrained.gif` from Gazebo (no RViz): query 5, tilt 29° vs 1° — e6db299.
 - README (GIF, results, a long "where it fails"), docs/architecture.md (Mermaid), docs/planners.md,
   docs/results.md, CHANGELOG, NOTES, CHECKPOINTS (0, 1, 2, final).
 
 **CI status:** never ran — GitHub refuses to start jobs on this account (billing). Latest run:
 <https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40619295823>
-(final push, 653ad0a; "The job was not started because recent account payments have failed…"). The identical steps pass locally (CHECKPOINTS.md, final).
+(final push, 534ad1f; "The job was not started because recent account payments have failed…"). The identical steps pass locally (CHECKPOINTS.md, final).
 
 **Things I got wrong overnight and fixed (worth knowing before the hour of questions):** the
 collision-check resolution, the validate/time-parameterize order, the yaw-dependent tolerance, a

@@ -44,7 +44,7 @@ On another ROS distro, use the devcontainer or the `Dockerfile` (base `ros:lyric
 | BiTRRT (range 2 rad) | none | 0/100 = 0 % (0 %–4 %) | – / – | – | – | – / – | not recorded |
 | BiTRRT (range 2 rad) | orientation | 83/100 = 83 % (74 %–89 %) | 2.195 / 8.591 | 5.34 | 1.47 | 1.3 / 4.3 | 82/83 |
 
-Source: `results/bench.csv + results/bench_bitrrt.csv` (400 rows, 100 queries, commit `03af439`, query seed 0, OMPL seed 1, modes `constrained_state_space`, `joint_space`, 10 s per cell, octomap 4747 occupied 2 cm voxels, total wall time 8.2 min).
+Source: `results/bench.csv + results/bench_bitrrt.csv` (400 rows, 100 queries, commit `00e1d72`, query seed 0, OMPL seed 1, modes `constrained_state_space`, `joint_space`, 10 s per cell, octomap 4747 occupied 2 cm voxels, total wall time 8.2 min).
 
 <!-- results:end -->
 
@@ -107,7 +107,7 @@ is in [docs/architecture.md](docs/architecture.md).
   not exercised (the generator's counters are in `results/queries.json`).
 - **Not bit-reproducible, and one repetition.** Queries are byte-identical from the seed (tested);
   plans are not, because OMPL stops on wall-clock time. An earlier run of an equivalent
-  configuration (commit c62bc8d's `results/bench.csv`) solved 84 instead of 79 keep-upright
+  configuration (commit 4060411's `results/bench.csv`) solved 84 instead of 79 keep-upright
   queries: within the Wilson intervals, but a reminder that one repetition per cell is thin. Seeds
   and the commit hash are stamped on every row.
 - **MoveIt 2.15.2's `~MoveItCpp` segfaults on shutdown** in this setup; the node writes its

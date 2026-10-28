@@ -6,7 +6,7 @@ Every number here comes from `results/bench.csv + results/bench_bitrrt.csv` thro
 `flock ~/work/.locks/gazebo.lock scripts/bench_planners.sh` (or the whole set with
 `scripts/regenerate_all.sh`), then run `scripts/aggregate.py`.
 
-Source: `results/bench.csv + results/bench_bitrrt.csv` (400 rows, 100 queries, commit `03af439`, query seed 0, OMPL seed 1, modes `constrained_state_space`, `joint_space`, 10 s per cell, octomap 4747 occupied 2 cm voxels, total wall time 8.2 min).
+Source: `results/bench.csv + results/bench_bitrrt.csv` (400 rows, 100 queries, commit `00e1d72`, query seed 0, OMPL seed 1, modes `constrained_state_space`, `joint_space`, 10 s per cell, octomap 4747 occupied 2 cm voxels, total wall time 8.2 min).
 
 ## Planner × constraint (feature prompt step 6)
 
@@ -56,9 +56,9 @@ across the middle board, or diagonal).
 
 ## How RRTConnect's range was chosen (tuning set, not the evaluation set)
 
-20 queries generated with seed 1 (`results/tuning/queries_seed1.json`), disjoint from the seed-0 evaluation queries, orientation constraint only, four `range` settings. The best success rate (ties: lower median time) became the benchmark planner configuration. Run before 56ea7e9, when the benchmark node built its own octomap from the same camera with identical settings (4747 voxels, the same count as move_group's map).
+20 queries generated with seed 1 (`results/tuning/queries_seed1.json`), disjoint from the seed-0 evaluation queries, orientation constraint only, four `range` settings. The best success rate (ties: lower median time) became the benchmark planner configuration. Run before db74fcc, when the benchmark node built its own octomap from the same camera with identical settings (4747 voxels, the same count as move_group's map).
 
-Source: `results/tuning/tuning.csv` (80 rows, commit `89533bb`).
+Source: `results/tuning/tuning.csv` (80 rows, commit `ca8deb5`).
 
 | Planner | Constraint | Success (95 % Wilson CI) | Planning time median / p95 (s) | Joint path median (rad) | TCP path median (m) | Max tool tilt median / worst (deg) | Executed path collision-free (dense check) |
 |---|---|---|---|---|---|---|---|
@@ -71,9 +71,9 @@ Failures by MoveIt error code: orientation code -6: 58.
 
 ## How BiTRRT's range was chosen (tuning set)
 
-Same protocol as for RRTConnect: the 20 seed-1 tuning queries, orientation constraint only, three `range` settings; the highest success rate became the BiTRRT column. Run before 56ea7e9, when the benchmark node built its own octomap from the same camera with identical settings (4747 voxels, the same count as move_group's map).
+Same protocol as for RRTConnect: the 20 seed-1 tuning queries, orientation constraint only, three `range` settings; the highest success rate became the BiTRRT column. Run before db74fcc, when the benchmark node built its own octomap from the same camera with identical settings (4747 voxels, the same count as move_group's map).
 
-Source: `results/tuning/tuning_bitrrt.csv` (60 rows, commit `8c41f37`).
+Source: `results/tuning/tuning_bitrrt.csv` (60 rows, commit `dfb0119`).
 
 | Planner | Constraint | Success (95 % Wilson CI) | Planning time median / p95 (s) | Joint path median (rad) | TCP path median (m) | Max tool tilt median / worst (deg) | Executed path collision-free (dense check) |
 |---|---|---|---|---|---|---|---|
@@ -87,7 +87,7 @@ Failures by MoveIt error code: orientation code -6: 24.
 
 SHOULD item. The first 20 seed-0 queries with the benchmark planner, octomap voxels of 2 cm (the default) in a fresh simulation; compare with the 5 cm section below.
 
-Source: `results/sweep/octomap_0.02.csv` (40 rows, commit `5a7e2b1`).
+Source: `results/sweep/octomap_0.02.csv` (40 rows, commit `426a525`).
 
 | Planner | Constraint | Success (95 % Wilson CI) | Planning time median / p95 (s) | Joint path median (rad) | TCP path median (m) | Max tool tilt median / worst (deg) | Executed path collision-free (dense check) |
 |---|---|---|---|---|---|---|---|
@@ -100,7 +100,7 @@ Failures by MoveIt error code: orientation code -6: 5.
 
 Same 20 queries, octomap voxels of 5 cm. Coarser voxels inflate obstacles by up to a voxel, which eats the generator's 3 cm clearance; `start_valid`/`goal_valid` in the CSV show how many queries become invalid.
 
-Source: `results/sweep/octomap_0.05.csv` (40 rows, commit `5a7e2b1`).
+Source: `results/sweep/octomap_0.05.csv` (40 rows, commit `426a525`).
 
 | Planner | Constraint | Success (95 % Wilson CI) | Planning time median / p95 (s) | Joint path median (rad) | TCP path median (m) | Max tool tilt median / worst (deg) | Executed path collision-free (dense check) |
 |---|---|---|---|---|---|---|---|
@@ -111,9 +111,9 @@ Failures by MoveIt error code: none code -10: 6, none code -27: 4, orientation c
 
 ## Ablation: collision-check resolution 0.005 (MoveIt's usual value)
 
-The same 100 evaluation queries with the first configuration: `longest_valid_segment_fraction: 0.005`, OMPL's automatic range, time parameterization before `ValidateSolution` (0.1 rad blending), keep-upright reference yaw fixed at 0, OMPL seed 0. On the UR5e's 69 rad extent 0.005 means a collision check only every 0.35 rad; the unconstrained failures here are `ValidateSolution` rejections (error -2), not planner timeouts. Run before 56ea7e9, when the benchmark node built its own octomap from the same camera with identical settings (4747 voxels, the same count as move_group's map).
+The same 100 evaluation queries with the first configuration: `longest_valid_segment_fraction: 0.005`, OMPL's automatic range, time parameterization before `ValidateSolution` (0.1 rad blending), keep-upright reference yaw fixed at 0, OMPL seed 0. On the UR5e's 69 rad extent 0.005 means a collision check only every 0.35 rad; the unconstrained failures here are `ValidateSolution` rejections (error -2), not planner timeouts. Run before db74fcc, when the benchmark node built its own octomap from the same camera with identical settings (4747 voxels, the same count as move_group's map).
 
-Source: `results/ablation/bench_lvsf0.005.csv` (200 rows, commit `2f08131`).
+Source: `results/ablation/bench_lvsf0.005.csv` (200 rows, commit `6c12eeb`).
 
 | Planner | Constraint | Success (95 % Wilson CI) | Planning time median / p95 (s) | Joint path median (rad) | TCP path median (m) | Max tool tilt median / worst (deg) | Executed path collision-free (dense check) |
 |---|---|---|---|---|---|---|---|
@@ -141,8 +141,8 @@ Failures by MoveIt error code: none code -2: 17, orientation code -6: 88.
 | Octomap resolution sweep, RRTConnect (range 2 rad), orientation | success rate | 75 % | `scripts/bench_octomap_resolution.sh 20 0.02 0.05` |
 | Octomap resolution sweep, RRTConnect (range 2 rad), none | success rate | 50 % | `scripts/bench_octomap_resolution.sh 20 0.02 0.05` |
 | Octomap resolution sweep, RRTConnect (range 2 rad), orientation | success rate | 45 % | `scripts/bench_octomap_resolution.sh 20 0.02 0.05` |
-| Ablation, RRTConnect (auto range, 13.8 rad), none | success rate | 83 % | `git checkout 2f08131 && scripts/bench_planners.sh 100 results/ablation/bench_lvsf0.005.csv` |
-| Ablation, RRTConnect (auto range, 13.8 rad), orientation | success rate | 12 % | `git checkout 2f08131 && scripts/bench_planners.sh 100 results/ablation/bench_lvsf0.005.csv` |
+| Ablation, RRTConnect (auto range, 13.8 rad), none | success rate | 83 % | `git checkout 6c12eeb && scripts/bench_planners.sh 100 results/ablation/bench_lvsf0.005.csv` |
+| Ablation, RRTConnect (auto range, 13.8 rad), orientation | success rate | 12 % | `git checkout 6c12eeb && scripts/bench_planners.sh 100 results/ablation/bench_lvsf0.005.csv` |
 
 ## Plots
 

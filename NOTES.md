@@ -136,7 +136,7 @@ install/pcp_benchmark/lib/pcp_benchmark/generate_queries --urdf results/tmp/ur5e
   `longest_valid_segment_fraction: 0.005`, OMPL checks motions only every ~0.35 rad, so paths can
   step over 2 cm octomap boards; MoveIt's `ValidateSolution` then rejects them (error -2). In the
   first run every unconstrained failure was -2. Fixed to 0.0003 (≈ 0.021 rad). The first run is
-  kept as an ablation (`results/ablation/bench_lvsf0.005.csv`, commit 2f08131).
+  kept as an ablation (`results/ablation/bench_lvsf0.005.csv`, commit 6c12eeb).
 - **RRTConnect range.** `range: 0` means 20 % of that extent = 13.8 rad per extension. Instead of
   tuning on the evaluation queries, range is chosen on a separate tuning set:
   `results/tuning/queries_seed1.json` (seed 1, 20 queries), orientation constraint only, ranges
@@ -145,7 +145,7 @@ install/pcp_benchmark/lib/pcp_benchmark/generate_queries --urdf results/tmp/ur5e
 
 ### Independent code review (subagent, read-only) — 04:50
 
-Findings acted on (commit 89533bb):
+Findings acted on (commit ca8deb5):
 
 1. TOTG ran before ValidateSolution with 0.1 rad blending → validation saw resampled, blended
    waypoints. Now ValidateSolution first, `totg.path_tolerance: 0.01`, plus a dense (0.01 rad)
@@ -165,7 +165,7 @@ stopped and re-queued after the fixes, so tuning uses the final pipeline.
 
 ### Final evaluation and GIF (05:05–05:42)
 
-- Evaluation (commit 8c81742): unconstrained 100/100, keep-upright 84/100 (Wilson 76–90 %), all
+- Evaluation (commit e3a1945): unconstrained 100/100, keep-upright 84/100 (Wilson 76–90 %), all
   16 failures 10 s timeouts; worst constrained tilt 3.6°; dense re-check 93/100 and 83/84.
   7.7 min wall time.
 - GIF: `joint_trajectory_controller` had never initialized in the sim (ros2_control 6.10: no params
@@ -190,7 +190,7 @@ stopped and re-queued after the fixes, so tuning uses the final pipeline.
 
 - First sweep/BiTRRT chain finished 06:27. The 5 cm sweep's snapshot recorded a **2 cm** octree:
   MoveItCpp's planning-scene monitor starts a world-geometry monitor, and the benchmark node had
-  been given `sensors_3d`, so it ran its own PointCloudOctomapUpdater at 2 cm. Fixed in a2441cd
+  been given `sensors_3d`, so it ran its own PointCloudOctomapUpdater at 2 cm. Fixed in 2951a4c
   (sensor/octomap params stripped from the benchmark node). Before the fix both updaters used the
   same camera and settings (4747 voxels either way), so tuning results are kept; the evaluation,
   BiTRRT column and sweep are re-run after the fix.
@@ -201,7 +201,7 @@ stopped and re-queued after the fixes, so tuning uses the final pipeline.
 - I stopped my own BiTRRT run once (05:45) to let R1 run its final smoke test first.
 - 06:40 the stripped benchmark node never received an octomap: in 2.15 MoveItCpp's monitor
   *listens* on `planning_scene` and *publishes* on `monitored_planning_scene`, and my remap had
-  pointed its publisher at move_group's topic. Fixed (56ea7e9): `planning_scene` →
+  pointed its publisher at move_group's topic. Fixed (db74fcc): `planning_scene` →
   `/monitored_planning_scene`. 2-query check: snapshot = move_group's map, 4747 voxels at 2 cm, the
   same count as the old self-built map. Re-running sweep, evaluation and BiTRRT after this fix.
 - 06:51–06:59 **lost run (my fault):** the post-fix evaluation wrote `results/bench.csv`, a tracked
@@ -251,6 +251,6 @@ See `CHANGELOG.md` → `[Unreleased]` (Added / Fixed), written this session.
 
 ### Commit-type deviation
 
-Five result commits (18750a3, c62bc8d, aaf106a, 4345452, f44225f) use a `data:` type, which is not
+Five result commits (987c515, 4060411, d09ddc2, a46137f, 8129897) use a `data:` type, which is not
 in the repo standard's list (feat/fix/docs/ci/test/chore/refactor). History is not rewritten
 (overnight rules); from now on result updates use `chore(results):`.

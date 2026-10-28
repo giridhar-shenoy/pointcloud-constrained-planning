@@ -52,7 +52,7 @@ lock gazebo scripts/bench_planners.sh 100 results/bench_bitrrt.csv results/queri
   results/bitrrt.yaml
 lock gazebo scripts/bench_octomap_resolution.sh 20 0.02 0.05
 # The 0.005-resolution ablation is regenerated at its own commit:
-#   git checkout 2f08131 && scripts/bench_planners.sh 100 results/ablation/bench_lvsf0.005.csv
+#   git checkout 6c12eeb && scripts/bench_planners.sh 100 results/ablation/bench_lvsf0.005.csv
 python3 scripts/aggregate.py
 lock gazebo scripts/record_gifs.sh results/bench.csv
 echo "[regenerate_all] done in $(( $(date +%s) - start )) s"
