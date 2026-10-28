@@ -66,11 +66,12 @@ flowchart LR
   3 s, clones the planning scene once, and passes that clone to every
   `PlanningComponent::plan(params, scene)` call. All 200 cells see the identical map, so differences
   between constraint types are not differences between octomap updates.
-- **Own namespace.** MoveItCpp's planning-scene monitor publishes its scene on the relative topic
-  `planning_scene`. In the root namespace that is `/planning_scene`, which `move_group` applies as a
-  diff, which it then republishes on `/monitored_planning_scene`, which MoveItCpp applies, and so on.
-  The node runs in `/pcp_benchmark` with `monitored_planning_scene` and `joint_states` remapped to the
-  global topics.
+- **Own namespace, one remap.** MoveItCpp's planning-scene monitor *listens* on the relative topic
+  `planning_scene` and *publishes* its maintained scene on `monitored_planning_scene`. The node runs
+  in `/pcp_benchmark` so its publisher cannot collide with `move_group`'s, and `planning_scene` is
+  remapped to `/monitored_planning_scene` so it receives `move_group`'s full scene and diffs,
+  octomap included (RViz is wired the same way). An earlier version remapped the publisher instead
+  and planned on a second, self-built octomap; see the bullet above.
 - **Queries without a ROS graph.** `generate_queries` is a plain C++ program: URDF + SRDF + shelf
   YAML + seed in, JSON out. That is what makes the determinism test possible (the test runs the same
   function and compares to the committed file byte for byte).
