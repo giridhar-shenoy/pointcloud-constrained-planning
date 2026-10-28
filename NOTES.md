@@ -467,4 +467,16 @@ against them); the items below are the ones the code depends on. File:line refs 
   (`exec.hpp/.cpp`) because the hook aborted its own commit; d6cafb2 also contains the CI and
   Dockerfile changes, staged during an earlier aborted commit. From now on `git reset` before
   staging each commit.
-- Dry run (5 queries, all three locks) queued behind R4's training (04:28).
+- Dry run (5 queries, all three locks) 04:45: 10/10, projection 26 min → full run 04:47.
+- **Full run 1 (04:47–05:04, commit b3a170c) — kept, not published as the table:**
+  `results/runs/bench_direct_run1_no_recovery.csv`. All 200 plans succeeded; executions were
+  fine for queries 0–56, then at query 57 MoveIt's executed trajectory hit the physical shelf in
+  Gazebo (its TOTG-blended path fails the dense 0.01 rad re-check with BOTH checkers), the
+  controller aborted on its 0.2 rad path tolerance with the arm 1.84 rad from the goal and in
+  contact, and my harness could not reposition from a colliding configuration ("Invalid
+  start"), so every later run reports "arm not at the query start" (85/200 repositioning
+  failures). The trigger is a real MoveIt result; the cascade is a harness bug. Fix: an escape
+  step (sample the nearest collision-free configuration with ≥ 5 mm clearance at growing radii,
+  move there in a straight line, then plan). The approved 100-query run is repeated with it.
+- The check-cost probe crashed once (SIGSEGV, intermittent; the same binary completed it twice
+  before and after). The chain now retries it once.
