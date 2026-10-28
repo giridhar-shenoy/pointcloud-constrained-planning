@@ -414,3 +414,31 @@ against them); the items below are the ones the code depends on. File:line refs 
   RRTConnect, SpaceInformation and RealVector headers used here are otherwise unchanged from 1.6.
 - The expanded URDF has no `<safety_controller>`, so MoveIt's joint bounds equal the `<limit>`
   values Pinocchio reads (±2π, elbow ±π); a test asserts it.
+
+### Progress log (session 2, overnight)
+
+- 02:37 Checkpoint 1 logged (overnight mode: no waiting). 02:59 Checkpoint 2 logged.
+- Collision module + 8 gtests pass first time; active pairs = MoveIt's checked pairs (62 = 62);
+  SRDF removes 7 geometry pairs (4 of its 11 entries involve links without geometry).
+- Build gotcha: Pinocchio's CMake config loads eigenpy's own FindBoost, which leaves
+  `Boost_USE_DEBUG_RUNTIME` set; MoveIt's later `find_package(Boost COMPONENTS chrono)` then
+  rejects the release libraries. Fix: find pinocchio/coal last and `unset(Boost_USE_DEBUG_RUNTIME)`.
+- Build gotcha: `moveit_planners_ompl` 2.15.2 exports `include/moveit_planners_ompl` as an
+  include dir, which does not exist (headers are in `include/moveit_planners`) → CMake generate
+  error. bench_direct links `libmoveit_ompl_interface` + that header dir directly.
+- MoveItCpp needs `planning_pipelines.pipeline_names: [ompl]` as a parameter (pcp_benchmark's
+  YAML has it; the agreement launch failed without it).
+- Agreement timing must include forward kinematics on both sides (MoveIt's OMPL checker sets the
+  state and updates transforms per check); first version timed MoveIt without FK.
+- Agreement: 500/500, identical pair lists, identical min distances; boundary probe 180/194, all
+  14 on forearm/wrist_3 at 1–5 nm (coal says contact, FCL says free). Commit 4412768.
+- 03:09 the session was killed by systemd-oomd during a `-j4` build (swap full, three sessions).
+  No committed work lost; uncommitted exec/bench files were complete on disk. From 03:35 builds
+  run `MAKEFLAGS=-j2 colcon build --parallel-workers 1` after waiting for ≥ 5 GB MemAvailable.
+- Plan-only smoke (3 queries, no Gazebo) works: all cross-checks clean. **Finding:** with the
+  same OMPL code, the direct simplifier takes 0.33–0.45 s against MoveIt's 0.06–0.13 s, and the
+  direct RRTConnect creates states more slowly; per-check cost differs only 1.3× (agreement
+  test). Hypothesis: MoveIt checks fewer states, i.e. its effective check spacing is not the
+  0.021 rad derived from the formula. bench_direct now reads MoveIt's configured OMPL context
+  (extent, longest valid segment, range, validator) and records it in the meta file instead of
+  assuming it.
