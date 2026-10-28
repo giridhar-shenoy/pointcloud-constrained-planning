@@ -254,3 +254,22 @@ See `CHANGELOG.md` → `[Unreleased]` (Added / Fixed), written this session.
 Five result commits (987c515, 4060411, d09ddc2, a46137f, 8129897) use a `data:` type, which is not
 in the repo standard's list (feat/fix/docs/ci/test/chore/refactor). History is not rewritten
 (overnight rules); from now on result updates use `chore(results):`.
+
+## Session 2 — 2026-10-29 (SPRINT OVERRIDE v0.2), Step 0: CI on main
+
+- Repo visibility: `gh repo view --json visibility` → `PUBLIC` (made public by Giri on 29 Oct), so
+  GitHub Actions now starts jobs (the billing block in MORNING.md item 1 is gone).
+- First run that actually executed: run 40649038811 on b587d57,
+  <https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40649038811>,
+  **success on the first attempt; no Dockerfile or ci.yml fix was needed.** Step times
+  (UTC 2026-10-28): lint 1 min 18 s; image build from the Dockerfile 6 min 34 s (cold cache);
+  rosdep 7 s; colcon build 53 s; colcon test 2 s (`Summary: 22 tests, 0 errors, 0 failures,
+  0 skipped`); pytest 2 passed; `ci_smoke` PASS in 16 s; mini-benchmark (5 queries ×
+  {none, orientation}) 54 s, 10 rows. Whole job ≈ 11 min of the 30 min cap.
+- Headless rendering on the runner works: `[smoke] octomap OK: 237755 bytes, resolution 0.02 m,
+  frame 'world', after 7.9 s` inside `ros:lyrical-ros-base` on the GitHub runner (Mesa, no GPU).
+  So the git-lfs point-cloud bag fallback (MORNING.md item 4) is not needed.
+- Warning in the run annotations, not an error: the actions pinned at `@v4/@v5/@v3/@v6`
+  (checkout, setup-python, cache, build-push-action, setup-buildx-action) target Node.js 20 and
+  are forced onto Node.js 24 by the runner. Left unchanged; listed as an open question.
+- Commands: `gh run watch 40649038811 --exit-status` (exit 0), `gh run view 40649038811 --log`.
