@@ -32,8 +32,29 @@ def generate_launch_description():
             "world_file": [world, " --headless-rendering"],
             "gazebo_gui": "false",
             "launch_rviz": "false",
+            # ur_sim_control's spawner loads the controller without --param-file; with
+            # ros2_control 6.10 / gz_ros2_control 3.0.9 the controller then starts with no
+            # `joints` and fails to initialize. Keep it inactive there and spawn it below.
             "initial_joint_controller": "joint_trajectory_controller",
+            "activate_joint_controller": "false",
         }.items(),
+    )
+
+    controllers_file = PathJoinSubstitution(
+        [FindPackageShare("ur_simulation_gz"), "config", "ur_controllers.yaml"]
+    )
+    jtc_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        name="spawner_jtc_with_params",
+        arguments=[
+            "joint_trajectory_controller",
+            "-c",
+            "/controller_manager",
+            "--param-file",
+            controllers_file,
+        ],
+        output="screen",
     )
 
     camera_bridge = Node(
@@ -83,6 +104,7 @@ def generate_launch_description():
             ),
             ur_sim,
             camera_bridge,
+            TimerAction(period=4.0, actions=[jtc_spawner]),
             TimerAction(period=move_group_delay, actions=[move_group]),
         ]
     )
