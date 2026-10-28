@@ -43,7 +43,7 @@ def generate_launch_description():
         package="pcp_benchmark",
         executable="pcp_benchmark",
         name="pcp_benchmark",
-        # Own namespace: MoveItCpp's planning-scene publisher must not feed back into move_group.
+        # Own namespace: MoveItCpp's planning-scene topics must not collide with move_group's.
         namespace="pcp_benchmark",
         output="screen",
         ros_arguments=[
@@ -73,8 +73,11 @@ def generate_launch_description():
                 ),
             },
         ],
+        # MoveItCpp's monitor LISTENS on `planning_scene` and PUBLISHES on
+        # `monitored_planning_scene`. Feed it move_group's maintained scene (full scene + diffs,
+        # octomap included), as RViz does; its own publisher stays in /pcp_benchmark.
         remappings=[
-            ("monitored_planning_scene", "/monitored_planning_scene"),
+            ("planning_scene", "/monitored_planning_scene"),
             ("joint_states", "/joint_states"),
         ],
     )
