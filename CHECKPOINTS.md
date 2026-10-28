@@ -118,3 +118,82 @@ metrics gtest), dry run + 100-query run, aggregate.py + docs/results.md, GIF, RE
 ### Does 1 Nov hold?
 
 Yes. CI green still depends on the billing decision.
+
+## CHECKPOINT 2 — bench.csv and aggregate table (2026-10-28 05:46 IST, not waiting)
+
+Wall-clock spent so far: ~2 h 16 min (since 03:30).
+
+### What happened between checkpoints 1 and 2
+
+1. First 100-query run (commit 2f08131, `longest_valid_segment_fraction` 0.005, automatic range):
+   unconstrained 83/100, every failure a `ValidateSolution` rejection (-2); orientation 12/100.
+   Diagnosed as my config: MoveIt's extent is the sum of joint ranges (69.1 rad for ±2π joints), so
+   0.005 = a motion check every 0.35 rad. Kept as `results/ablation/bench_lvsf0.005.csv`.
+2. Independent read-only code review (subagent) found two semantic problems — validation ran on
+   TOTG-resampled waypoints, and the rotation-vector tolerance depended on yaw offset — plus four
+   reporting issues. All fixed in 89533bb; NOTES.md lists them.
+3. RRTConnect `range` chosen on a separate tuning set (seed 1, 20 queries, orientation only):
+   auto (13.8 rad) 1/20, 0.5 → 4/20, 1 → 6/20, 2 → 11/20 ⇒ range 2 rad. The evaluation queries were
+   not used to choose it.
+4. Final evaluation run (commit 8c81742), table below. Then the GIF (query 2, tilt 37° vs 2°).
+
+### Checklist
+
+| Item | Status |
+|---|---|
+| `results/bench.csv` exists, 100 queries × {none, orientation}, commit + seeds stamped | PASS (200 rows, commit 8c81742, query seed 0, OMPL seed 1) |
+| Runtime ≤ 1 h | PASS: 7.7 min (dry run of 10 projected 16 min) |
+| Constrained state space really used | PASS: `planning_context_manager: Using OMPL's constrained state space for planning.` once per orientation request at debug level; `mode` column derived from config |
+| gtests: constraint builder, query determinism (regenerate + byte diff), metrics | PASS (22 colcon tests) |
+| ci_smoke after the launch change | PASS (14 s) |
+| GIF ≤ 3 MB, no RViz | PASS (1.6 MB, Gazebo camera + headless rendering) |
+| CI | BLOCKED (billing, MORNING.md) |
+
+### Command output
+
+```text
+$ flock ~/work/.locks/gazebo.lock scripts/ci_smoke.sh
+[with_sim] sim pgid=216505, log=/home/giri/work/r2/log/sim/sim_20261028_054215.log
+[smoke] octomap OK: 219925 bytes, resolution 0.02 m, frame 'world', after 7.0 s
+[smoke] plan to free goal OK: error_code 1, planning_time 0.232 s, 29 waypoints
+[smoke] plan into the octomap board REJECTED (OK): error_code 99999
+[with_sim] simulation group 216505 fully stopped
+[ci_smoke] PASS in 14 s
+$ colcon test --packages-select pcp_scenes pcp_benchmark && colcon test-result --verbose
+Summary: 22 tests, 0 errors, 0 failures, 0 skipped
+$ python3 -m pytest -q scripts/tests
+4 passed in 0.01s
+$ .venv/bin/pre-commit run --all-files | grep -c Failed
+0
+$ pgrep -af "[b]in/gz sim" || echo none
+$ python3 scripts/aggregate.py --csv results/bench.csv --print-only
+Source: `results/bench.csv` (200 rows, 100 queries, commit `8c81742`, query seed 0, OMPL seed 1, modes `constrained_state_space`, `joint_space`, 10 s per cell, octomap 4747 occupied 2 cm voxels, total wall time 7.7 min).
+| Planner | Constraint | Success (95 % Wilson CI) | Planning time median / p95 (s) | Joint path median (rad) | TCP path median (m) | Max tool tilt median / worst (deg) | Executed path collision-free (dense check) |
+|---|---|---|---|---|---|---|---|
+| RRTConnect (range 2 rad) | none | 100/100 = 100 % (96 %–100 %) | 0.382 / 0.915 | 4.75 | 1.14 | 51.9 / 177.2 | 93/100 |
+| RRTConnect (range 2 rad) | orientation | 84/100 = 84 % (76 %–90 %) | 2.014 / 8.257 | 5.00 | 1.55 | 1.4 / 3.6 | 83/84 |
+$ git status --short
+$ git log --oneline | head -12
+c62bc8d data: 100-query evaluation with RRTConnect range 2 rad (commit 8c81742)
+7e01960 feat(gif): constrained vs unconstrained GIF of evaluation query 2
+40e725c fix(bringup): spawn the trajectory controller with its parameter file
+f29ae77 chore(scripts): regenerate tuning, BiTRRT and sweep results in regenerate_all
+a325e23 feat(bench): octomap resolution sweep (2 cm vs 5 cm) tooling
+33b6999 feat(bench): prepare BiTRRT column and multi-planner aggregation
+8c81742 feat(bench): use RRTConnect range 2 rad, chosen on the seed-1 tuning set
+a54bbfb docs: document success semantics, yaw coupling and range selection
+89533bb fix(benchmark): validate what is executed, centre the keep-upright yaw
+18750a3 data: keep the first 100-query run as the 0.005-resolution ablation
+0135225 docs: add architecture (Mermaid), planners and scripts pages
+de9584a feat(bench): tuning-set support and ablation sections in results.md
+```
+
+### MUST list remaining
+
+None on the code/results side. CI-green cannot be verified (billing). Perceptyne L3 JD phrase
+needs Giri (MORNING.md item 2). Next: SHOULD items (BiTRRT column, 2 cm vs 5 cm sweep), then final
+docs and checkpoint.
+
+### Does 1 Nov hold?
+
+Yes. The only open MUST acceptance item is CI-green, which needs the billing/visibility decision.
