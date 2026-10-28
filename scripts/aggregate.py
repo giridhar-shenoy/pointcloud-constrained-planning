@@ -18,6 +18,8 @@ import statistics
 from collections import defaultdict
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
+DIRECT_START = "<!-- direct:start -->"
+DIRECT_END = "<!-- direct:end -->"
 Z95 = 1.959963984540054
 
 # Reference categorical palette, slots 1-2 (validated adjacent pair), light surface.
@@ -514,7 +516,14 @@ across the middle board, or diagonal).
         results_md += (
             "\n## Plots\n\n" + "\n".join(f"![{p.stem}](assets/{p.name})" for p in plots) + "\n"
         )
-    (REPO / "docs" / "results.md").write_text(results_md)
+    results_path = REPO / "docs" / "results.md"
+    # v0.2: scripts/aggregate_direct.py owns the block between these markers (direct pipeline vs
+    # MoveIt, collision agreement); regenerating the v0.1 tables must keep it.
+    old = results_path.read_text() if results_path.exists() else ""
+    if DIRECT_START in old and DIRECT_END in old:
+        block = old[old.index(DIRECT_START) : old.index(DIRECT_END) + len(DIRECT_END)]
+        results_md += "\n" + block + "\n"
+    results_path.write_text(results_md)
 
     readme = REPO / "README.md"
     text = readme.read_text()
