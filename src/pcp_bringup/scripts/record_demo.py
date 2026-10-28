@@ -34,7 +34,6 @@ CAMERA_SDF = """<?xml version="1.0"?>
 <sdf version="1.9">
   <model name="demo_camera">
     <static>true</static>
-    <pose>{x} {y} {z} 0 {pitch} {yaw}</pose>
     <link name="link">
       <sensor name="demo_camera" type="camera">
         <always_on>true</always_on>
@@ -141,11 +140,13 @@ def main() -> int:
     ap.add_argument("--hold", type=float, default=1.0, help="seconds recorded after the motion")
     args = ap.parse_args()
 
-    sdf = CAMERA_SDF.format(
-        x=-0.55, y=-0.95, z=1.05, pitch=0.43, yaw=0.76, fps=args.fps, w=480, h=360
-    )
+    sdf = CAMERA_SDF.format(fps=args.fps, w=480, h=360)
+    # `create` overrides the model's <pose> with its -x/-y/-z/-R/-P/-Y arguments (default 0),
+    # so the pose goes on the command line.
+    pose = {"-x": -0.55, "-y": -0.95, "-z": 1.05, "-R": 0.0, "-P": 0.43, "-Y": 0.76}
     subprocess.run(
-        ["ros2", "run", "ros_gz_sim", "create", "-string", sdf, "-name", "demo_camera"],
+        ["ros2", "run", "ros_gz_sim", "create", "-string", sdf, "-name", "demo_camera"]
+        + [str(v) for kv in pose.items() for v in kv],
         check=True,
         timeout=60,
     )
