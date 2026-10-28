@@ -14,12 +14,10 @@ concurrency:
 
 env:
   IMAGE: pcp:ci
-  # Every in-container step runs through this wrapper: the workspace is bind-mounted at /ws and
-  # the image entrypoint sources /opt/ros/lyrical (and /ws/install when it exists).
-  RUN_IN: >-
-    docker run --rm --user root -e HOME=/root -e CI=true
-    -e ROS_DOMAIN_ID=12 -e GZ_PARTITION=r2 -e MAKEFLAGS=-j4
-    -v ${{ github.workspace }}:/ws -w /ws pcp:ci
+  # Every in-container step runs in ONE long-lived container (started below), so packages that
+  # rosdep installs survive into the build and test steps. The image's entrypoint script sources
+  # /opt/ros/lyrical and, once it exists, /ws/install.
+  RUN_IN: docker exec pcp /usr/local/bin/pcp-entrypoint.sh
 
 jobs:
   build-test:
@@ -58,6 +56,12 @@ jobs:
           tags: ${{ env.IMAGE }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Start the CI container (workspace bind-mounted at /ws)
+        run: >-
+          docker run -d --name pcp --user root -e HOME=/root -e CI=true
+          -e ROS_DOMAIN_ID=12 -e GZ_PARTITION=r2 -e MAKEFLAGS=-j4
+          -v ${{ github.workspace }}:/ws -w /ws --entrypoint sleep ${{ env.IMAGE }} infinity
 
       - name: rosdep install
         run: >-
