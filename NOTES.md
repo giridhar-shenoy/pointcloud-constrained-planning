@@ -211,3 +211,40 @@ stopped and re-queued after the fixes, so tuning uses the final pipeline.
   now on: no commits while a benchmark writes; evaluation re-run goes to `results/tmp/` and is
   moved into place afterwards; `bench_planners.sh` will write a `.partial` file and rename it
   (changed only after the running BiTRRT job finishes, because bash reads scripts while running).
+
+### Runtimes measured tonight (i5-1135G7, shared machine)
+
+| Step | Wall time |
+|---|---|
+| colcon build (incremental / pcp_benchmark from scratch) | 1 s / ~45 s |
+| unit tests (22 colcon + 4 pytest) | ~10 s |
+| `ci_smoke.sh` | 14–16 s |
+| `bench_planners.sh 5` (CI mini-benchmark) | 41 s |
+| tuning set, RRTConnect (80 cells) | 10.7 min |
+| tuning set, BiTRRT (60 cells) | 6 min |
+| evaluation, RRTConnect (200 cells) | 8.2 min |
+| evaluation, BiTRRT (200 cells) | 23.7 min |
+| octomap sweep (2 × 40 cells) | ~6 min |
+| `record_gifs.sh` | ~5 min |
+| `regenerate_all.sh` end to end | not run (≈ 60 min > 30 min rule; MORNING.md item 3) |
+
+## CHANGELOG entry for this session
+
+See `CHANGELOG.md` → `[Unreleased]` (Added / Fixed), written this session.
+
+## Open questions for Giri
+
+1. CI: fix the account's Actions billing, or make the repo public now? (MORNING.md item 1)
+2. Which Perceptyne L3 JD phrase should the README table evidence? (item 2)
+3. OK to run `regenerate_all.sh` end to end (~60 min, holds the Gazebo lock)? (item 3)
+4. If CI cannot render the depth camera on llvmpipe, OK to record a < 50 MB git-lfs bag? (item 4)
+5. The keep-upright tolerance is the square inscribed in the 5° cone (sound, conservative, yaw
+   coupled). Keep it, or report the per-axis-5° variant (up to 7.1° tilt) as a second row?
+6. Range tuning stopped at 2 rad for RRTConnect while success was still rising; extend the
+   candidate set (e.g. 3, 4 rad) on the tuning queries next session?
+7. 6/100 unconstrained trajectories graze the octomap between checked states: add a small
+   collision padding for the octomap (trade-off: more queries become invalid, like the 5 cm sweep)?
+8. pick_ik (1.1.3) and TRAC-IK (2.2.0) exist on Lyrical as apt candidates; KDL is used (and the
+   generator has its own IK). Install either for move_group? (ask-me item; not needed for v0.1)
+9. GIF framing: the arm sits at the left edge of the demo camera; worth a camera move before the
+   README goes public?
