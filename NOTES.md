@@ -442,3 +442,29 @@ against them); the items below are the ones the code depends on. File:line refs 
   0.021 rad derived from the formula. bench_direct now reads MoveIt's configured OMPL context
   (extent, longest valid segment, range, validator) and records it in the meta file instead of
   assuming it.
+- **Hypothesis rejected (04:20):** MoveIt's configured OMPL context, read from the context
+  `plan()` builds, is identical to the direct planner's: extent 69.115 rad, longest valid segment
+  0.02073 rad (fraction 0.0003), RRTConnect range 2, `DiscreteMotionValidator`. The "same
+  settings" claim is now measured (recorded in every bench_direct `.meta.json`).
+- **Where the time goes (probe, 3 dev queries):** MoveIt's planner core makes about as many
+  validity checks as the direct planner (9.4k vs 10.3k, 10.8k vs 11.2k, 7.9k vs 6.3k) but each
+  costs 9–21 µs inside MoveIt's planner vs 50–70 µs in the direct one. Explanation (not yet
+  profiled): Pinocchio's `computeCollisions` runs coal's narrow phase on every one of the 62
+  active pairs per check, while MoveIt's FCL environment culls pairs with an AABB-tree broadphase
+  and only runs the narrow phase on overlapping bounding volumes. The agreement microbenchmark
+  (random configurations, 69 % colliding → early exit, cold caches) understates the gap (49 vs
+  61 µs). Next step (not this week): `pinocchio::BroadPhaseManager` / coal broadphase in the
+  direct checker. The first probe version wrapped MoveIt's checker generically and segfaulted:
+  MoveIt static-casts the space's validity checker to `ompl_interface::StateValidityChecker`, so
+  the counter subclasses that type.
+- **Gazebo execution check (2 queries, 04:27, gazebo lock):** both pipelines execute at full
+  speed (π rad/s, 5 rad/s²) without aborts; max tracking error 0.034–0.054 rad, final error
+  < 0.0005 rad, 0/4 repositioning failures, 55 s. v0.1's "needs 15× slow-down" was about
+  replaying TOTG trajectories that clipped the shelf; at these limits the controller tracks.
+  So decision D6 (common scaling) is not needed. MoveIt's query-0 trajectory failed the dense
+  0.01 rad re-check with BOTH checkers (TOTG blends between validated waypoints), as in v0.1.
+- **Commit hygiene slips (not rewritten):** dd23b65 also contains the executor
+  (`exec.hpp/.cpp`) because the hook aborted its own commit; d6cafb2 also contains the CI and
+  Dockerfile changes, staged during an earlier aborted commit. From now on `git reset` before
+  staging each commit.
+- Dry run (5 queries, all three locks) queued behind R4's training (04:28).
