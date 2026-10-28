@@ -248,3 +248,9 @@ See `CHANGELOG.md` → `[Unreleased]` (Added / Fixed), written this session.
    generator has its own IK). Install either for move_group? (ask-me item; not needed for v0.1)
 9. GIF framing: the arm sits at the left edge of the demo camera; worth a camera move before the
    README goes public?
+
+### Commit-type deviation
+
+Five result commits (18750a3, c62bc8d, aaf106a, 4345452, f44225f) use a `data:` type, which is not
+in the repo standard's list (feat/fix/docs/ci/test/chore/refactor). History is not rewritten
+(overnight rules); from now on result updates use `chore(results):`.
