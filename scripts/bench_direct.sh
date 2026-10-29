@@ -2,10 +2,12 @@
 # Direct OMPL + Pinocchio/coal pipeline vs MoveIt 2 on the same queries, shelf boxes, planner
 # settings and controller: N queries x {direct, moveit} x RRTConnect x unconstrained x 1 rep.
 #
-#   scripts/bench_direct.sh [N] [OUT_CSV] [--plan-only]
+#   scripts/bench_direct.sh [N] [OUT_CSV] [--plan-only | --octomap]
 #   defaults: 100, results/bench_direct.csv, with execution in Gazebo
 #
 # --plan-only needs no Gazebo (CI mini-benchmark): plan, parameterise and cross-validate only.
+# --octomap (SHOULD) starts the sim for move_group's camera octomap and plans both pipelines on
+#   that one frozen map (no boxes, no execution).
 # With execution the sim (v0.1 sim.launch.py) is started and torn down by scripts/with_sim.sh.
 # Timings are published, so on the shared machine run it alone, under all three locks:
 #   flock ~/work/.locks/heavy.lock flock ~/work/.locks/build.lock \
@@ -43,6 +45,9 @@ if [ "${MODE}" = "--plan-only" ]; then
   source "${REPO}/install/setup.bash"
   set -u
   timeout "${PCP_BENCH_TIMEOUT:-1800}" "${LAUNCH[@]}" execute:=false
+elif [ "${MODE}" = "--octomap" ]; then
+  timeout "${PCP_BENCH_TIMEOUT:-900}" "${REPO}/scripts/with_sim.sh" "${LAUNCH[@]}" execute:=false \
+    scene:=octomap
 else
   timeout "${PCP_BENCH_TIMEOUT:-6000}" "${REPO}/scripts/with_sim.sh" "${LAUNCH[@]}" execute:=true
 fi
