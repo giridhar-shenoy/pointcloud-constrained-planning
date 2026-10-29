@@ -647,7 +647,8 @@ R_tool^T R_target with per-axis dead bands, co-dimension 3, as MoveIt formulates
 ### Both pipelines on move_group's octomap (SHOULD)
 
 The direct checker reads the octomap MoveIt built from the simulated camera (`world.octomap` of
-the frozen scene, `octomap_msgs::binaryMsgToMap`) as one `coal::OcTree`, so both pipelines plan on
+the frozen scene's message, `octomap_msgs::msgToMap`, since MoveIt writes a full rather than
+binary map) as one `coal::OcTree`, so both pipelines plan on
 the identical map and the v0.1 query set (`queries.json` = `queries_boxes.json`) is reused.
 Plan only, unconstrained (`scripts/bench_direct.sh 100 results/bench_direct_octomap.csv
 --octomap`).

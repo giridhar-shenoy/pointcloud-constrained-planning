@@ -427,8 +427,9 @@ int main(int argc, char ** argv)
     if (octomap_scene != has_octomap) {
       throw std::runtime_error("the frozen scene's octomap does not match bench.scene");
     }
-    // The direct checker gets the SAME map: MoveIt's frozen octomap, through its message form
-    // (octomap_msgs::binaryMsgToMap), as one coal::OcTree.
+    // The direct checker gets the SAME map: MoveIt's frozen octomap, through its message form,
+    // as one coal::OcTree. MoveIt writes a full (not binary) map into the scene message, so
+    // octomap_msgs::msgToMap (which handles both) is used rather than binaryMsgToMap.
     std::shared_ptr<const octomap::OcTree> octree;
     double octomap_resolution = 0.0;
     if (octomap_scene) {
@@ -442,7 +443,7 @@ int main(int argc, char ** argv)
         throw std::runtime_error("the octomap origin is not the identity; not supported");
       }
       std::unique_ptr<octomap::AbstractOcTree> abstract(
-        octomap_msgs::binaryMsgToMap(msg.world.octomap.octomap));
+        octomap_msgs::msgToMap(msg.world.octomap.octomap));
       auto * tree = dynamic_cast<octomap::OcTree *>(abstract.get());
       if (tree == nullptr) {
         throw std::runtime_error("the scene's octomap message is not an OcTree");
