@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include <geometric_shapes/shapes.h>
+#include <octomap/OcTree.h>
 #include <moveit/planning_scene/planning_scene.hpp>
 #include <moveit/robot_state/robot_state.hpp>
 
@@ -157,6 +159,50 @@ TEST_F(DirectCollision, ToolInsideTheMiddleBoardCollidesWithIt)
   EXPECT_TRUE(has_board(d));
   EXPECT_TRUE(has_board(moveitPairs(q)));
   EXPECT_LE(direct_->pairDistance(q, {"board_middle", "wrist_3_link"}), 0.0);
+}
+
+// SHOULD (shared octomap): the same octree in MoveIt's scene (as its "<octomap>" object) and in the
+// direct checker (one coal::OcTree) gives the same verdicts and names the same pair.
+TEST_F(DirectCollision, OctreeGivesTheSameVerdictsAsMoveIt)
+{
+  auto tree = std::make_shared<octomap::OcTree>(0.02);
+  for (double x = 0.41; x < 0.80; x += 0.02) {  // fill board_middle's volume with 2 cm voxels
+    for (double y = -0.61; y < 0.62; y += 0.02) {
+      tree->updateNode(octomap::point3d(x, y, 0.49), true);
+    }
+  }
+  tree->updateInnerOccupancy();
+  planning_scene::PlanningScene scene(model_);
+  scene.getWorldNonConst()->addToObject(
+    planning_scene::PlanningScene::OCTOMAP_NS, std::make_shared<const shapes::OcTree>(tree),
+    Eigen::Isometry3d::Identity());
+  CollisionChecker direct(
+    readTextFile(PCP_TEST_URDF), readTextFile(PCP_TEST_SRDF), {}, jmg_->getVariableNames(), {},
+    tree);
+  const std::vector<double> home = {0.0, -1.5707, 0.0, 0.0, 0.0, 0.0};
+  moveit::core::RobotState state(model_);
+  state.setToDefaultValues();
+  state.setJointGroupPositions(jmg_, home);
+  state.update();
+  EXPECT_FALSE(moveit_reference::isColliding(scene, state, kGroup));
+  EXPECT_FALSE(direct.isColliding(home));
+
+  pcp_benchmark::GeneratorConfig cfg;
+  state.setJointGroupPositions(
+    jmg_, std::vector<double>{std::atan2(0.30, 0.60), -1.2, 1.6, -M_PI / 2 - 0.4, -M_PI / 2, 0.0});
+  ASSERT_TRUE(
+    pcp_benchmark::solveIkDls(
+      state, jmg_, model_->getLinkModel("tool0"),
+      pcp_benchmark::toolDownPose(Eigen::Vector3d(0.60, 0.30, 0.49), 0.0), cfg));
+  std::vector<double> q;
+  state.copyJointGroupPositions(jmg_, q);
+  state.update();
+  EXPECT_TRUE(moveit_reference::isColliding(scene, state, kGroup));
+  EXPECT_TRUE(direct.isColliding(q));
+  const auto d = direct.collidingPairs(q);
+  const auto m = moveit_reference::collidingPairs(scene, state, kGroup);
+  EXPECT_FALSE(d.empty());
+  EXPECT_EQ(d, m);
 }
 
 TEST_F(DirectCollision, IsValidCountsAndTimesCalls)

@@ -7,7 +7,9 @@
 #include <sstream>
 #include <stdexcept>
 
+#include <coal/octree.h>
 #include <coal/shape/geometric_shapes.h>
+#include <octomap/OcTree.h>
 #include <yaml-cpp/yaml.h>
 
 #include <pinocchio/algorithm/geometry.hpp>
@@ -109,7 +111,8 @@ struct CollisionChecker::Impl
 
 CollisionChecker::CollisionChecker(
   const std::string & urdf_xml, const std::string & srdf_xml, const std::vector<BoxSpec> & boxes,
-  const std::vector<std::string> & joint_names, const std::vector<std::string> & package_dirs)
+  const std::vector<std::string> & joint_names, const std::vector<std::string> & package_dirs,
+  std::shared_ptr<const octomap::OcTree> octree)
 : joint_names_(joint_names)
 {
   pinocchio::Model model;
@@ -122,6 +125,13 @@ CollisionChecker::CollisionChecker(
     auto shape = std::make_shared<coal::Box>(box.size.x(), box.size.y(), box.size.z());
     const pinocchio::SE3 placement(Eigen::Matrix3d::Identity(), box.position);
     geom.addGeometryObject(pinocchio::GeometryObject(box.name, 0, 0, placement, shape));
+  }
+
+  if (octree) {
+    // MoveIt names its octomap world object "<octomap>" (PlanningScene::OCTOMAP_NS).
+    geom.addGeometryObject(
+      pinocchio::GeometryObject(
+        "<octomap>", 0, 0, pinocchio::SE3::Identity(), std::make_shared<coal::OcTree>(octree)));
   }
 
   geom.addAllCollisionPairs();
