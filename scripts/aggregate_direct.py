@@ -377,8 +377,8 @@ def probe_table(probe: list[dict]) -> str:
         ),
         (
             "Share of solve + simplify spent in the checker",
-            f"{100 * share('direct'):.0f} %",
-            f"{100 * share('moveit'):.0f} %",
+            f"{100 * share('direct'):.1f} %",
+            f"{100 * share('moveit'):.1f} %",
         ),
     ]
     return "\n".join(
@@ -432,10 +432,12 @@ def make_plot(rows: list[dict], timeout: float, out: pathlib.Path) -> pathlib.Pa
     ax.plot([lo, hi], [lo, hi], color=_agg.TEXT_2, linewidth=1.0, linestyle="--", zorder=1)
     ax.annotate(
         "equal time",
-        (hi / 1.6, hi / 1.6),
+        (lo * 2.2, lo * 2.2),
+        xytext=(6, -10),
+        textcoords="offset points",
         rotation=45,
         color=_agg.TEXT_2,
-        ha="right",
+        ha="left",
         va="bottom",
         fontsize=8,
     )
@@ -471,7 +473,7 @@ def make_plot(rows: list[dict], timeout: float, out: pathlib.Path) -> pathlib.Pa
     ax.set_xlabel("MoveIt 2: planning_time = OMPL solve + simplify (s)")
     ax.set_ylabel("Direct: OMPL solve + simplify (s)")
     ax.set_title(
-        f"Same queries, same OMPL settings: direct slower on {above} of {len(both)}",
+        f"Direct slower than MoveIt on {above} of {len(both)} queries",
         loc="left",
         color=_agg.TEXT,
         fontsize=10,
