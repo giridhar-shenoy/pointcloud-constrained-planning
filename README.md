@@ -94,6 +94,14 @@ Source: `results/bench_direct.csv` (200 rows, 100 queries, 0 skipped, commit `54
 
 ![Per-query planning time, direct vs MoveIt, log axes](docs/assets/direct_vs_moveit_planning_time.png)
 
+**Two more comparisons on the same queries (plan only, tables in
+[docs/results.md](docs/results.md)).** With v0.1's keep-upright constraint in both pipelines (an
+`ompl::base::Constraint` on OMPL's `ProjectedStateSpace` for the direct planner), the direct
+pipeline plans 58/100 within 10 s against MoveIt's 88/100, with tool tilt at most 1.8° vs 3.2°. On
+move_group's octomap (the 4747-voxel map v0.1 used, handed to the direct checker as one
+`coal::OcTree`), both plan 100/100 and the planning-time gap shrinks to 1.3× (0.47 s vs 0.37 s
+median), because MoveIt's FCL check also gets more expensive against an octree.
+
 **What is identical.** Robot and URDF (the same `robot_description` string), the SRDF's disabled
 pairs (both checkers test the same 62 pairs; a unit test compares the sets), the seven shelf boxes
 (one YAML, loaded as coal boxes and published to MoveIt as `CollisionObject`s), zero padding,
@@ -185,8 +193,15 @@ parameterisers), and the per-request check counts (MoveIt does not expose them).
   with a broadphase first. MoveIt's machinery outside the planner (planning context set-up,
   adapters, TOTG) costs 0.048 s per request (median; p95 0.195 s: `plan()` wall time minus
   `planning_time`), against 0.0003 s for the direct pipeline's parameterisation, which is not
-  enough to close the gap: request → trajectory is still 0.402 s direct vs 0.169 s MoveIt. The
-  fix (coal's broadphase through Pinocchio) is not in v0.2.
+  enough to close the gap: request → trajectory is still 0.402 s direct vs 0.169 s MoveIt. On
+  the octomap, where FCL's checks also get expensive, the gap shrinks to 1.3×, consistent with
+  this explanation. The fix (coal's broadphase through Pinocchio) is not in v0.2.
+- **v0.2: keep-upright planning is weaker in the direct pipeline.** With the same constraint
+  definition, the direct planner solves 58/100 queries within 10 s against MoveIt's 88/100
+  (solve + simplify median 4.0 s vs 1.0 s). Projection and every motion check along the
+  constrained geodesics pay the slower per-check cost. MoveIt's constrained checker also
+  re-checks the path constraint at exact tolerance, while mine relies on the projection's 1e-4
+  residual: the direct paths tilt at most 1.8°, MoveIt's at most 3.2°.
 - **v0.2: simplification dominates direct planning time.** Simplification took longer than the
   OMPL solve on 93 of 100 direct plans. The simplifier is OMPL's (the same
   code as in MoveIt), but every one of its thousands of motion checks pays the per-check cost

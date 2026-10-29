@@ -206,7 +206,33 @@ R_tool^T R_target with per-axis dead bands, co-dimension 3, as MoveIt formulates
 `ProjectedStateSpace`; MoveIt gets v0.1's `OrientationConstraint` with
 `enforce_constrained_state_space`. Plan only, same queries.
 
-Not run.
+| Keep-upright (5°), plan only | Direct (OMPL + coal) | MoveIt 2 (MoveItCpp) |
+|---|---|---|
+| Planned (Wilson 95 %) | 58/100 = 58 % (48 %–67 %) | 88/100 = 88 % (80 %–93 %) |
+| OMPL solve + simplification, median / p95 (s) | 4.025 / 9.096 | 1.047 / 7.090 |
+| Request → trajectory, median / p95 (s) | 4.025 / 9.096 | 1.068 / 7.123 |
+| Max tool tilt along the path, median / worst (deg) | 0.7 / 1.8 | 1.5 / 3.2 |
+| Path clean for the other pipeline's checker | 58/58 | 85/88 |
+
+Source: `results/bench_direct_upright.csv` (200 rows, commit `1d8e13a`, 10 s per plan, total wall time 16.3 min).
+
+### Both pipelines on move_group's octomap (SHOULD)
+
+The direct checker reads the octomap MoveIt built from the simulated camera (`world.octomap` of
+the frozen scene's message, `octomap_msgs::msgToMap`, since MoveIt writes a full rather than
+binary map) as one `coal::OcTree`, so both pipelines plan on
+the identical map and the v0.1 query set (`queries.json` = `queries_boxes.json`) is reused.
+Plan only, unconstrained (`scripts/bench_direct.sh 100 results/bench_direct_octomap.csv
+--octomap`).
+
+| Octomap scene, plan only | Direct (OMPL + coal) | MoveIt 2 (MoveItCpp) |
+|---|---|---|
+| Planned (Wilson 95 %) | 100/100 = 100 % (96 %–100 %) | 100/100 = 100 % (96 %–100 %) |
+| OMPL solve + simplification, median / p95 (s) | 0.473 / 1.025 | 0.367 / 0.775 |
+| Collision check, median (µs) | 52.3 | not exposed |
+| Path clean for the other pipeline's checker / its own (0.01 rad) | 96 / 96 of 100 | 92 / 92 of 100 |
+
+Source: `results/bench_direct_octomap.csv` (200 rows, 0 queries skipped because a start or goal collides with the map for either checker, commit `bba7c00`, 4747 occupied 2 cm leaves, total wall time 1.8 min).
 
 ### Collision agreement (MoveIt's planning scene vs the direct checker)
 
@@ -222,6 +248,9 @@ Files: `results/collision_agreement.csv` (+ `.meta.json`),
 | Collision agreement (500 configurations + boundary probe) | `scripts/collision_agreement.sh 500` |
 | Direct vs MoveIt, 100 queries with execution | `scripts/bench_direct.sh 100 && scripts/aggregate_direct.py` |
 | CI mini-benchmark, 5 queries, plan only | `scripts/bench_direct.sh 5 results/tmp/ci_direct5.csv --plan-only` |
+| Check-count probe, 20 queries | `scripts/check_probe.sh 20` |
+| Keep-upright, both pipelines, 100 queries, plan only | `PCP_CONSTRAINT=orientation scripts/bench_direct.sh 100 results/bench_direct_upright.csv --plan-only` |
+| Octomap scene, both pipelines, 100 queries, plan only | `scripts/bench_direct.sh 100 results/bench_direct_octomap.csv --octomap` |
 
 ![direct_vs_moveit_planning_time](assets/direct_vs_moveit_planning_time.png)
 
