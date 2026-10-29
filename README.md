@@ -78,7 +78,7 @@ on the same scene ([docs/results.md](docs/results.md#collision-agreement-moveits
 | Time parameterisation, median / p95 (s) | 0.000025 / 0.000047 | inside `plan()` (TOTG adapter) | no: trapezoid vs TOTG |
 | **Request → time-parameterised trajectory**, median / p95 (s) | 0.402 / 1.040 | 0.169 / 0.471 | **yes**: wall time, same process |
 | Validity checks per request, median / p95 | 7668 / 19644 | not exposed | direct only |
-| Collision check, median (µs) | 50.8 | 48.9 (agreement test, not in the plan) | yes (agreement test: same configurations, both with FK) |
+| Collision check inside the planner, median over 20 probe queries (µs) | 48.6 | 12.4 | yes: same queries, each measured inside its own planner (probe) |
 | Trajectory duration, median / p95 (s) | 3.85 / 6.60 | 3.14 / 5.61 | no: rest-to-rest trapezoids vs TOTG on the interpolated path |
 | Joint path length, median (rad) | 4.71 | 4.51 | yes (same metric) |
 | TCP path length, median (m) | 1.18 | 1.13 | yes (same metric) |

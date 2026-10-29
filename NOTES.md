@@ -535,3 +535,12 @@ See `CHANGELOG.md` → `[Unreleased]` → "Added / Fixed / Changed (v0.2)".
 6. Keep the harness "escape" step as is (2 escapes in 400 executions + repositions), or report
    aborted executions without recovery?
 7. `regenerate_all.sh` end to end is now ≈ 60 min (v0.1) + ≈ 50 min (v0.2): approve one run?
+
+### Corrections after the summary
+
+- **Correction (06:50, 5061abd):** the main table's "collision check" row had put the direct
+  planner's in-planner median (50.8 µs) beside the agreement microbenchmark's MoveIt median
+  (48.9 µs) as "like for like". It was not: the microbenchmark uses random, mostly colliding
+  configurations with cold caches. The row now shows the probe (both inside their own planner,
+  same 20 queries): 48.6 vs 12.4 µs. The CHECKPOINT 3 log keeps the original table as logged;
+  MORNING.md notes the correction under its copy.
