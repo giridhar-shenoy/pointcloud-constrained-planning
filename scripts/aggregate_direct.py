@@ -154,13 +154,26 @@ def mp(s: dict, digits: int = 3) -> str:
     return "–" if s["n"] == 0 else f"{f(s['median'], digits)} / {f(s['p95'], digits)}"
 
 
-def main_table(sm: dict, agreement: dict | None) -> str:
+def main_table(sm: dict, agreement: dict | None, probe: list[dict] | None = None) -> str:
     d, m = sm["direct"], sm["moveit"]
-    check_moveit = (
-        f"{agreement['moveit_check_us_median']:.1f} (agreement test, not in the plan)"
-        if agreement
-        else "not exposed by MoveItCpp"
-    )
+    # Per-check cost inside each planner comes from the probe (same queries, both measured inside
+    # their own planner). The agreement test's microbenchmark is NOT comparable to an in-planner
+    # median (random, mostly colliding configurations, cold caches), so it is not used here.
+    ok = [e for e in (probe or []) if e["moveit"].get("success") and e["direct"].get("success")]
+    if ok:
+        check_row = (
+            f"Collision check inside the planner, median over {len(ok)} probe queries (µs)",
+            f(statistics.median(e["direct"]["check_time_us_median"] for e in ok), 1),
+            f(statistics.median(e["moveit"]["check_time_us_median"] for e in ok), 1),
+            "yes: same queries, each measured inside its own planner (probe)",
+        )
+    else:
+        check_row = (
+            "Collision check inside the planner, median (µs)",
+            f(d["check_time_us_median"]["median"], 1),
+            "not exposed by MoveItCpp (run scripts/check_probe.sh)",
+            "direct only",
+        )
     rows = [
         (
             "Planned (Wilson 95 %)",
@@ -204,12 +217,7 @@ def main_table(sm: dict, agreement: dict | None) -> str:
             "not exposed",
             "direct only",
         ),
-        (
-            "Collision check, median (µs)",
-            f(d["check_time_us_median"]["median"], 1),
-            check_moveit,
-            "yes (agreement test: same configurations, both with FK)",
-        ),
+        check_row,
         (
             "Trajectory duration, median / p95 (s)",
             mp(d["traj_duration_s"], 2),
@@ -291,10 +299,13 @@ def agreement_paragraph(meta: dict, boundary: list[dict]) -> str:
         f"{', '.join(p.replace('|', '/') for p in pairs) or 'no pair'}, where {sep_txt} and coal "
         f"reports contact: hundreds of times below coal's GJK tolerance (1e-6 m) and Pinocchio's "
         f"`distance_upper_bound` (1e-6 m), so either verdict is inside the libraries' stated "
-        f"precision. Nothing was tuned to raise these numbers. Per check, including forward "
-        f"kinematics, MoveIt takes {meta['moveit_check_us_median']:.1f} µs and the direct checker "
-        f"{meta['direct_check_us_median']:.1f} µs (median): Pinocchio tests every active pair "
-        f"in a loop, while MoveIt's FCL environment runs a broadphase first."
+        f"precision. Nothing was tuned to raise these numbers. On these random configurations "
+        f"(two thirds colliding, so both stop early; cold caches) a check including forward "
+        f"kinematics takes {meta['moveit_check_us_median']:.1f} µs in MoveIt and "
+        f"{meta['direct_check_us_median']:.1f} µs in the direct checker (median). Inside the "
+        f"planners, where most states are free, the gap is wider (the probe below): Pinocchio "
+        f"tests every active pair in a loop, while MoveIt's FCL environment runs a broadphase "
+        f"first."
     )
 
 
@@ -569,7 +580,6 @@ def main() -> int:
         agreement = json.loads((agr_path.parent / (agr_path.name + ".meta.json")).read_text())
         bpath = agr_path.with_name(agr_path.stem + "_boundary.csv")
         boundary = load(bpath) if bpath.exists() else []
-    table = main_table(sm, agreement)
     upright_path = REPO / args.upright
     upright = "Not run."
     if (REPO / (args.upright + ".meta.json")).exists():
@@ -587,6 +597,7 @@ def main() -> int:
         if probe_meta_path.exists()
         else []
     )
+    table = main_table(sm, agreement, probe)
     mo = meta.get("moveit_ompl_context", {})
     source = (
         f"Source: `{args.csv}` ({len(rows)} rows, {sm['queries']} queries, "
