@@ -298,6 +298,49 @@ def agreement_paragraph(meta: dict, boundary: list[dict]) -> str:
     )
 
 
+def upright_table(rows: list[dict], meta: dict) -> str:
+    """SHOULD item: keep-upright (v0.1's orientation constraint) planned by both pipelines."""
+    sm = summarise(rows)
+    tilt = {
+        pl: [
+            float(r["max_tilt_deg"])
+            for r in rows
+            if r["pipeline"] == pl and r["plan_success"] == "1" and r.get("max_tilt_deg")
+        ]
+        for pl in PIPELINES
+    }
+    lines = [
+        "| Keep-upright (5°), plan only | " + " | ".join(LABEL[p] for p in PIPELINES) + " |",
+        "|---|---|---|",
+        "| Planned (Wilson 95 %) | "
+        + " | ".join(
+            frac(sm[p]["planned"], sm[p]["attempted"], sm[p]["planned_ci"]) for p in PIPELINES
+        )
+        + " |",
+        "| OMPL solve + simplification, median / p95 (s) | "
+        + " | ".join(mp(sm[p]["plan_plus_simplify_s"]) for p in PIPELINES)
+        + " |",
+        "| Request → trajectory, median / p95 (s) | "
+        + " | ".join(mp(sm[p]["time_to_trajectory_s"]) for p in PIPELINES)
+        + " |",
+        "| Max tool tilt along the path, median / worst (deg) | "
+        + " | ".join(
+            f"{f(statistics.median(tilt[p]), 1)} / {f(max(tilt[p]), 1)}" if tilt[p] else "–"
+            for p in PIPELINES
+        )
+        + " |",
+        "| Path clean for the other pipeline's checker | "
+        + " | ".join(f"{sm[p]['crossval_ok']}/{sm[p]['planned']}" for p in PIPELINES)
+        + " |",
+    ]
+    source = (
+        f"Source: `{meta.get('csv', '')}` ({len(rows)} rows, commit `{meta['commit']}`, "
+        f"{meta['planning_time_s']:.0f} s per plan, total wall time "
+        f"{meta['total_wall_time_s'] / 60:.1f} min)."
+    )
+    return "\n".join(lines) + "\n\n" + source
+
+
 def probe_table(probe: list[dict]) -> str:
     """Where the planning time goes: MoveIt's planner core (its own planning context with a
     counting validity checker) vs the direct planner, on the same queries."""
@@ -466,7 +509,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", default="results/bench_direct.csv")
     ap.add_argument("--agreement", default="results/collision_agreement.csv")
-    ap.add_argument("--probe", default="results/check_probe.csv")
+    ap.add_argument("--probe", default="results/check_probe.json")
+    ap.add_argument("--upright", default="results/bench_direct_upright.csv")
     ap.add_argument("--no-plots", action="store_true")
     ap.add_argument("--print-only", action="store_true")
     args = ap.parse_args()
@@ -482,7 +526,13 @@ def main() -> int:
         bpath = agr_path.with_name(agr_path.stem + "_boundary.csv")
         boundary = load(bpath) if bpath.exists() else []
     table = main_table(sm, agreement)
-    probe_meta_path = REPO / (args.probe + ".meta.json")
+    upright_path = REPO / args.upright
+    upright = "Not run."
+    if (REPO / (args.upright + ".meta.json")).exists():
+        umeta = json.loads((REPO / (args.upright + ".meta.json")).read_text())
+        umeta["csv"] = args.upright
+        upright = upright_table(load(upright_path), umeta)
+    probe_meta_path = REPO / args.probe
     probe = (
         json.loads(probe_meta_path.read_text()).get("moveit_check_probe", [])
         if probe_meta_path.exists()
@@ -538,9 +588,18 @@ def main() -> int:
 MoveIt's `planning_time` hides its internals, so a separate probe solves the first queries again
 in the OMPL planning context MoveIt builds for `plan()`, with MoveIt's own validity checker
 subclassed to count and time every call, and with the direct planner
-(`PCP_PROBE_QUERIES=20 scripts/bench_direct.sh 0 {args.probe} --plan-only`; adapters bypassed).
+(`scripts/check_probe.sh 20`, one query per process; the pipeline's adapters are bypassed).
 
 {probe_table(probe)}
+
+### Keep-upright in both pipelines (SHOULD)
+
+The direct planner gets v0.1's constraint as an `ompl::base::Constraint` (the rotation vector of
+R_tool^T R_target with per-axis dead bands, co-dimension 3, as MoveIt formulates it) on OMPL's
+`ProjectedStateSpace`; MoveIt gets v0.1's `OrientationConstraint` with
+`enforce_constrained_state_space`. Plan only, same queries.
+
+{upright}
 
 ### Collision agreement (MoveIt's planning scene vs the direct checker)
 
