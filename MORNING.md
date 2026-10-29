@@ -147,6 +147,11 @@ Source: `results/bench_direct.csv` (200 rows, 100 queries, 0 skipped, commit `54
 
 Details and the first (cascaded) run: CHECKPOINTS.md "v0.2 CHECKPOINT 3".
 
+Correction after this table was logged: its "Collision check, median" row put the direct planner's
+in-planner median next to the agreement test's random-configuration median for MoveIt, which is not
+like for like. The published table (README, docs/results.md) now shows both measured inside their
+planner on the same 20 probe queries: 48.6 µs direct vs 12.4 µs MoveIt.
+
 ## WAITING FOR GIRI
 
 ### v0.2 (29 Oct night) — decisions taken on my recommendation, please confirm
