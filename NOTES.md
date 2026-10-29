@@ -505,3 +505,33 @@ against them); the items below are the ones the code depends on. File:line refs 
   finished cleanly, so the final `.partial` → CSV rename did not run. The node's CSV and meta were
   complete (200 rows, `done:` logged); I did the two `mv`s by hand. Rule restated: never edit a
   script that a running job executes (NOTES session 1 already said so).
+
+### Session 2 summary (until ≈ 06:40 IST)
+
+- MUST list done and merged (b9e3d19, main CI green). SHOULD items both done on the branch:
+  keep-upright (4a6186f, 1d8e13a, results 227d6a3) and shared octomap (b334471, f1e0a46,
+  bba7c00, results 8816c04).
+- Runtimes: collision agreement 500 ≈ 10 s; bench_direct 100 queries with execution 28.2 min;
+  check probe 20 queries ≈ 61 s; keep-upright 100 plan-only 16.3 min; octomap 100 plan-only
+  2.2 min incl. sim start; pcp_direct build 30–70 s (-j2); CI job ≈ 12 min.
+- Commands that worked: `scripts/collision_agreement.sh 500`, `scripts/bench_direct.sh 100`,
+  `scripts/check_probe.sh 20`, `PCP_CONSTRAINT=orientation scripts/bench_direct.sh 100 OUT
+  --plan-only`, `scripts/bench_direct.sh 100 OUT --octomap`, `scripts/aggregate_direct.py`, all
+  under `flock heavy flock build flock gazebo` with the 5 GB memory wait.
+
+### CHANGELOG entry for session 2
+
+See `CHANGELOG.md` → `[Unreleased]` → "Added / Fixed / Changed (v0.2)".
+
+### Open questions for Giri (session 2)
+
+1. Confirm D1–D5 (NOTES "Decisions to confirm"); D2 (L1 metric) and D4 (limits) change numbers.
+2. The Perceptyne L3 phrase for the README row (still `TODO(Giri)`).
+3. Branch protection on main, and bumping the Node.js-20 GitHub Actions?
+4. The direct checker's per-check cost (no broadphase) explains the 3.3× planning gap; worth a
+   v0.3 with `pinocchio::BroadPhaseManager`, re-run on the same queries?
+5. One repetition per cell again: run 3 repetitions of the 100-query table (≈ 85 min of
+   Gazebo, over the 75-min single-run budget) to put spread on the timing columns?
+6. Keep the harness "escape" step as is (2 escapes in 400 executions + repositions), or report
+   aborted executions without recovery?
+7. `regenerate_all.sh` end to end is now ≈ 60 min (v0.1) + ≈ 50 min (v0.2): approve one run?

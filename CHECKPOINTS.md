@@ -406,3 +406,44 @@ Source: `results/bench_direct.csv` (200 rows, 100 queries, 0 skipped, commit `54
 Wall-clock to here ≈ 3 h 20 min (incl. ≈ 1 h waiting for locks and the oomd restart).
 Left: commit docs, push, CI, merge (approved once CI is green and this CSV exists), CHECKPOINT 4,
 then the SHOULD items. 1 Nov holds.
+
+## v0.2 CHECKPOINT 4 — docs on the branch; merged into main (2026-10-29 06:02 IST, overnight mode)
+
+```text
+$ gh run view 40793970183 --json conclusion          # feat/direct-pipeline aff8d0d
+success   (43 gtests, smoke + agreement 50/50, both mini-benchmarks)
+$ ls results/bench_direct.csv results/bench_direct.csv.meta.json   # full 100-query run, 5432d60
+$ git switch main && git merge --no-ff feat/direct-pipeline   # b9e3d19, pushed
+$ git diff HEAD~1 HEAD -- docs/results.md | grep '^-' | grep -v '^---'   # (nothing: v0.1 tables untouched)
+```
+
+- On the branch and merged: README v0.2 section (generated table, figure, fairness paragraph,
+  like-for-like columns, eight "where it fails" items, next steps, intro and JD-table cells),
+  docs/results.md v0.2 block (table, agreement paragraph, probe table, regenerate commands),
+  docs/architecture.md direct lane, CHANGELOG `[Unreleased]` v0.2 entries, regenerate_all.sh.
+- **Merge decision: merged** (overnight rule 4: CI green on the branch and the 100-query CSV
+  exists), not deferred. No v0.1 number changed (results.md diff is additions only; README
+  removals are prose: intro, language split, the stale CI bullet, table cells extended).
+- The Perceptyne L3 row is still `TODO(Giri)` (no application notes in the repo).
+- SHOULD in progress on the branch after the merge: keep-upright in the direct pipeline
+  (4a6186f, 1d8e13a), 100-query plan-only run under the locks.
+- Main CI after the merge: run 40794749550 on b9e3d19 → **success**.
+
+### SHOULD items (after the MUST merge, on the branch)
+
+```text
+$ flock heavy flock build flock gazebo /tmp/r2run/chain3.sh     # keep-upright, plan only
+upright projection for 100 queries: 1072 s (17 min); budget 1200 s
+done: 200 rows, 0 skipped queries, ..., 977.8 s                  # commit 1d8e13a
+  direct 58/100, MoveIt 88/100; solve+simplify median 4.0 s vs 1.0 s; worst tilt 1.8 vs 3.2 deg
+$ flock heavy flock build flock gazebo /tmp/r2run/chain4.sh     # octomap scene, plan only
+octomap for both checkers: 4747 occupied leaves, resolution 0.020 m
+octomap projection for 100 queries: 94 s (1 min); budget 840 s
+[bench_direct] 200 rows in results/bench_direct_octomap.csv (commit bba7c00) in 129 s
+  both 100/100; solve+simplify 0.473 s vs 0.367 s (paired ratio 1.3)
+$ build/pcp_direct/test_constraint    -> [  PASSED  ] 4 tests
+$ build/pcp_direct/test_collision     -> [  PASSED  ] 9 tests (incl. the octree agreement test)
+```
+
+Both SHOULD runs: the other pipeline's checker agrees with each path's own dense check on every
+row. Second merge of the branch (SHOULD commits) follows once the branch CI is green.
