@@ -13,6 +13,11 @@
 
 #include <Eigen/Core>
 
+namespace octomap
+{
+class OcTree;
+}
+
 namespace pcp_direct
 {
 
@@ -52,10 +57,13 @@ public:
   /// @param boxes        world boxes, attached to the universe
   /// @param joint_names  the order in which configurations are passed to this class
   /// @param package_dirs directories searched for package:// meshes (share/.. of each package)
+  /// @param octree       optional occupancy map (e.g. the one MoveIt built), added as one
+  ///                     coal::OcTree on the universe; named "<octomap>" like MoveIt's object
   CollisionChecker(
     const std::string & urdf_xml, const std::string & srdf_xml, const std::vector<BoxSpec> & boxes,
     const std::vector<std::string> & joint_names,
-    const std::vector<std::string> & package_dirs = {});
+    const std::vector<std::string> & package_dirs = {},
+    std::shared_ptr<const octomap::OcTree> octree = nullptr);
   ~CollisionChecker();
   CollisionChecker(const CollisionChecker &) = delete;
   CollisionChecker & operator=(const CollisionChecker &) = delete;
