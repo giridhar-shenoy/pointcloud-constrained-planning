@@ -57,6 +57,31 @@ direct checker (coal through Pinocchio), with identical pair lists; boundary pro
 differences on forearm_link/wrist_3_link at 1–5 nm separation (below coal's 1e-6 m GJK tolerance).
 Details: CHECKPOINTS.md "v0.2 CHECKPOINT 2". Work continued per the overnight rules.
 
+## v0.2 CHECKPOINT 3 RESULT — direct vs MoveIt, 100 queries with execution (you asked to see the table before plotting)
+
+| Metric | Direct (OMPL + coal) | MoveIt 2 (MoveItCpp) | Like for like? |
+|---|---|---|---|
+| Planned (Wilson 95 %) | 100/100 = 100 % (96 %–100 %) | 100/100 = 100 % (96 %–100 %) | yes |
+| **OMPL solve + simplification**, median / p95 (s) | 0.402 / 1.039 | 0.123 / 0.274 | **yes**: MoveIt's `planning_time` is solve + simplify |
+| OMPL solve only, median / p95 (s) | 0.081 / 0.531 | inside `planning_time` | direct only |
+| Simplification, median / p95 (s) | 0.320 / 0.688 | inside `planning_time` | direct only |
+| Time parameterisation, median / p95 (s) | 0.000025 / 0.000047 | inside `plan()` (TOTG adapter) | no: trapezoid vs TOTG |
+| **Request → time-parameterised trajectory**, median / p95 (s) | 0.402 / 1.040 | 0.169 / 0.471 | **yes**: wall time, same process |
+| Validity checks per request, median / p95 | 7668 / 19644 | not exposed | direct only |
+| Collision check, median (µs) | 50.8 | 48.9 (agreement test, not in the plan) | yes (agreement test: same configurations, both with FK) |
+| Trajectory duration, median / p95 (s) | 3.85 / 6.60 | 3.14 / 5.61 | no: rest-to-rest trapezoids vs TOTG on the interpolated path |
+| Joint path length, median (rad) | 4.71 | 4.51 | yes (same metric) |
+| TCP path length, median (m) | 1.18 | 1.13 | yes (same metric) |
+| Path clean for the OTHER pipeline's checker at 0.01 rad (cross-validation) | 97/100 | 91/100 | yes |
+| Path clean for its OWN checker at 0.01 rad | 97/100 | 91/100 | yes (a failure here is a discretisation miss, not a checker disagreement) |
+| Executed and reached the goal (≤ 0.01 rad) | 100/100 = 100 % (96 %–100 %) | 99/100 = 99 % (95 %–100 %) | yes: same controller |
+| Execution time, median / p95 (sim s) | 3.87 / 6.61 | 3.18 / 5.60 | no: follows the trajectory duration; MoveIt adds its execution manager |
+| Max joint tracking error, median / p95 (rad) | 0.0330 / 0.0538 | 0.0457 / 0.0578 | yes: same controller, same measurement |
+
+Source: `results/bench_direct.csv` (200 rows, 100 queries, 0 skipped, commit `5432d60`, query seed 0, OMPL seed 1 (direct only), with execution, 10 s per plan, total wall time 28.2 min). Direct: RRTConnectRange2, range 2.00 rad, check every 0.0207 rad (extent 69.12 rad). MoveIt's configured context: range 2, check every 0.0207 rad (extent 69.12 rad).
+
+Details and the first (cascaded) run: CHECKPOINTS.md "v0.2 CHECKPOINT 3".
+
 ## WAITING FOR GIRI
 
 ### v0.2 (29 Oct night) — decisions taken on my recommendation, please confirm

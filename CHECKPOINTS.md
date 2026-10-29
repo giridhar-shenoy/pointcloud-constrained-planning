@@ -343,3 +343,66 @@ $ flock heavy flock build flock gazebo scripts/collision_agreement.sh 500 result
 Files: `results/collision_agreement.csv` (+ `.meta.json`), `results/collision_agreement_boundary.csv`
 (commit 4412768). Wall-clock this checkpoint: ≈ 50 min. Left: planner, traj, exec, bench, docs,
 CI, merge. 1 Nov holds.
+
+## v0.2 CHECKPOINT 3 — dry run, projection, full run (2026-10-29, overnight mode)
+
+Dry run, 5 queries with execution, all three locks, commit b3a170c (clean):
+
+```text
+$ flock heavy flock build flock gazebo /tmp/r2run/chain.sh     # wraps scripts/bench_direct.sh
+dry run start 04:45:35
+MoveIt's OMPL context: longest_valid_segment_fraction 0.0003, longest_valid_segment_rad 0.0207345,
+  max_extent_rad 69.115, DiscreteMotionValidator, ur_manipulator[RRTConnectRange2], range 2
+direct planner: RRTConnectRange2, range 2.000 rad, extent 69.115 rad, check every 0.0207 rad
+reposition: not at target (action failed, Aborted due to path tolerance violation)   # 1st move from the spawn pose; retry succeeded
+query 0..4: 10/10 planned and executed (both pipelines)
+done: 10 rows, 0 skipped queries, 0/10 repositioning failures, 80.1 s
+[bench_direct] 10 rows in results/tmp/dry5.csv (commit b3a170c) in 93 s
+projection for 100 queries: 1615 s (26 min); budget 4500 s
+full run start 04:47:08
+```
+
+Projection = 93 s (5 queries incl. sim start-up) + 95 × 16.0 s/query = 26 min ≤ 75 min, so the
+full run started immediately under the overnight approval (no waiting for Giri).
+
+Run 1 (04:47–05:04, b3a170c) cascaded after a MoveIt execution left the arm against the shelf and
+the harness could not plan from a colliding start; kept as
+`results/runs/bench_direct_run1_no_recovery.csv`, fixed in 2ace597 (escape step). Repeated run:
+
+```text
+$ flock heavy flock build flock gazebo /tmp/r2run/chain2.sh
+dry run rc=0 elapsed 89 s at 05:19:25
+projection for 100 queries: 1533 s (25 min); budget 4500 s
+full run start 05:19:25
+done: 200 rows, 0 skipped queries, 0/200 repositioning failures, 1694.8 s
+full run rc=0 at 05:47:53                     # results/bench_direct.csv, commit 5432d60 (3e8b566)
+$ flock heavy flock build flock gazebo scripts/check_probe.sh 20
+[check_probe] 20 queries -> results/check_probe.json (commit 7560eec)
+```
+
+**Aggregate table (shown before plotting, per the brief):**
+
+| Metric | Direct (OMPL + coal) | MoveIt 2 (MoveItCpp) | Like for like? |
+|---|---|---|---|
+| Planned (Wilson 95 %) | 100/100 = 100 % (96 %–100 %) | 100/100 = 100 % (96 %–100 %) | yes |
+| **OMPL solve + simplification**, median / p95 (s) | 0.402 / 1.039 | 0.123 / 0.274 | **yes**: MoveIt's `planning_time` is solve + simplify |
+| OMPL solve only, median / p95 (s) | 0.081 / 0.531 | inside `planning_time` | direct only |
+| Simplification, median / p95 (s) | 0.320 / 0.688 | inside `planning_time` | direct only |
+| Time parameterisation, median / p95 (s) | 0.000025 / 0.000047 | inside `plan()` (TOTG adapter) | no: trapezoid vs TOTG |
+| **Request → time-parameterised trajectory**, median / p95 (s) | 0.402 / 1.040 | 0.169 / 0.471 | **yes**: wall time, same process |
+| Validity checks per request, median / p95 | 7668 / 19644 | not exposed | direct only |
+| Collision check, median (µs) | 50.8 | 48.9 (agreement test, not in the plan) | yes (agreement test: same configurations, both with FK) |
+| Trajectory duration, median / p95 (s) | 3.85 / 6.60 | 3.14 / 5.61 | no: rest-to-rest trapezoids vs TOTG on the interpolated path |
+| Joint path length, median (rad) | 4.71 | 4.51 | yes (same metric) |
+| TCP path length, median (m) | 1.18 | 1.13 | yes (same metric) |
+| Path clean for the OTHER pipeline's checker at 0.01 rad (cross-validation) | 97/100 | 91/100 | yes |
+| Path clean for its OWN checker at 0.01 rad | 97/100 | 91/100 | yes (a failure here is a discretisation miss, not a checker disagreement) |
+| Executed and reached the goal (≤ 0.01 rad) | 100/100 = 100 % (96 %–100 %) | 99/100 = 99 % (95 %–100 %) | yes: same controller |
+| Execution time, median / p95 (sim s) | 3.87 / 6.61 | 3.18 / 5.60 | no: follows the trajectory duration; MoveIt adds its execution manager |
+| Max joint tracking error, median / p95 (rad) | 0.0330 / 0.0538 | 0.0457 / 0.0578 | yes: same controller, same measurement |
+
+Source: `results/bench_direct.csv` (200 rows, 100 queries, 0 skipped, commit `5432d60`, query seed 0, OMPL seed 1 (direct only), with execution, 10 s per plan, total wall time 28.2 min). Direct: RRTConnectRange2, range 2.00 rad, check every 0.0207 rad (extent 69.12 rad). MoveIt's configured context: range 2, check every 0.0207 rad (extent 69.12 rad).
+
+Wall-clock to here ≈ 3 h 20 min (incl. ≈ 1 h waiting for locks and the oomd restart).
+Left: commit docs, push, CI, merge (approved once CI is green and this CSV exists), CHECKPOINT 4,
+then the SHOULD items. 1 Nov holds.

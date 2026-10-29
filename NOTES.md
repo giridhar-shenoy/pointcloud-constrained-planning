@@ -480,3 +480,20 @@ against them); the items below are the ones the code depends on. File:line refs 
   move there in a straight line, then plan). The approved 100-query run is repeated with it.
 - The check-cost probe crashed once (SIGSEGV, intermittent; the same binary completed it twice
   before and after). The chain now retries it once.
+- **Full run 2 (05:19–05:47, commit 5432d60) = the published table** (`results/bench_direct.csv`,
+  3e8b566): both 100/100 planned; executed to the goal direct 100/100, MoveIt 99/100 (query 63:
+  path clean on both dense checks, but the arm lagged 0.207 rad > the 0.2 rad path tolerance →
+  ABORTED, arm in contact → escape 0.010 rad). One direct REPOSITIONING move (q91 → q92 start)
+  aborted the same way (escape 0.009 rad). 2 escapes, 0 failures. Solve + simplify median
+  0.402 s vs 0.123 s (paired ratio 3.25, direct faster on 0/100); request → trajectory 0.402 s
+  vs 0.169 s; MoveIt's `plan()` wall minus `planning_time` = 0.048 s median. Simplification >
+  solve on 93/100 direct plans. Dense 0.01 rad re-checks: 97/100 direct and 91/100 MoveIt
+  clean, and cross-validation equals the own-checker result on every row → no checker
+  disagreement along any path; all misses are discretisation.
+- **Probe (`scripts/check_probe.sh 20`, 7560eec):** checks per request median 9,564 direct vs
+  8,768 MoveIt; median check 48.6 µs vs 12.4 µs; checker share of solve + simplify 99.6 % vs
+  92.5 %. Two crash modes when one process probed many queries (SIGSEGV; then
+  `free(): invalid pointer` even after restoring MoveIt's checker and keeping counters alive):
+  reusing MoveIt's cached planning context after swapping its checker is not safe, so the
+  script runs one query per process.
+- Commit-message slip: 3e8b566 says "one escape"; the meta file counts 2 (above).
