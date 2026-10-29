@@ -1,6 +1,70 @@
 # MORNING — pointcloud-constrained-planning (R2)
 
-## STATUS
+## STATUS (v0.2, 29 Oct 2026, ≈ 06:50 IST)
+
+**Done — sprint override v0.2, MUST list and both SHOULD items, merged into main:**
+
+- Step 0: CI green on main on the first run once the repo was public (run 40649038811, b587d57; no
+  Dockerfile/ci.yml fix needed; the runner renders the depth camera). NOTES entry 30677c4.
+- `src/pcp_direct` (C++17), the direct pipeline:
+  - Pinocchio/coal collision checker, 62 pairs = MoveIt's (unit-tested): 134f81a.
+  - Collision agreement: **500/500 = 100 %**, boundary probe 180/194 (all 14 differences at
+    1–5 nm on forearm/wrist_3): 4412768.
+  - RRTConnect planner in a `RealVectorStateSpace` with MoveIt's L1 metric: 7ac371c. Its settings
+    are measured identical in MoveIt's own context: dd23b65.
+  - R1's trapezoid parameteriser (copied, THIRD_PARTY.md): ea0a771. Executor, tracking monitor
+    and `bench_direct`: dd23b65. Escape fix: 2ace597.
+- **100 queries, direct vs MoveIt 2, with execution in Gazebo** (`results/bench_direct.csv`, 3e8b566):
+  - Both planned 100/100.
+  - Executed to goal: direct 100/100, MoveIt 99/100.
+  - Solve + simplify median 0.402 s vs 0.123 s (paired 3.3×). Request → trajectory 0.402 s vs
+    0.169 s.
+  - Tracking error 0.033 vs 0.046 rad.
+  - Dense re-checks: other checker = own checker on every path.
+- Probe (`results/check_probe.json`, 7560eec): same number of checks, 48.6 µs vs 12.4 µs per
+  check. The gap is the direct checker (no broadphase), not MoveIt's machinery.
+- SHOULD, keep-upright (4a6186f/1d8e13a, 227d6a3): direct 58/100 vs MoveIt 88/100.
+- SHOULD, octomap (b334471/f1e0a46/bba7c00, 8816c04): both 100/100, gap 1.3×.
+- Docs: README v0.2 section, fairness paragraph, "where it fails", architecture lane, results
+  block, CHANGELOG, `regenerate_all.sh` (8958d60, 95ea063, 4ba747c, 26366b7).
+- **Merged into main:** b9e3d19 (MUST; main CI run 40794749550 green) and ee232d7 (SHOULD).
+
+**CI status:**
+
+- Branch, latest code: green, 49 gtests
+  (<https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40797577403>).
+- Main after the MUST merge: green
+  (<https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40794749550>).
+- Main after the SHOULD merge: run 40798341717 on ee232d7 (see CHECKPOINTS.md / NOTES.md for its
+  result).
+
+**Things I got wrong tonight and fixed** (NOTES.md has each with its commit):
+
+- I timed MoveIt's checks without forward kinematics.
+- A generic probe wrapper crashed MoveIt.
+- The harness had no recovery from an aborted execution: run 1 cascaded, and it is kept in
+  `results/runs/`.
+- I edited a script while it was running.
+- Two commits bundled extra files.
+- My hypothesis that MoveIt checks less often was wrong: it is measured equal.
+
+**Blocked — decisions needed (WAITING FOR GIRI below):**
+
+1. Confirm D1–D5.
+2. The Perceptyne L3 phrase.
+3. Branch protection / Node-20 actions.
+4. Approve a `regenerate_all.sh` end-to-end run (≈ 110 min).
+5. Optional: 3 repetitions of the 100-query table.
+
+**Next three steps:**
+
+1. A broadphase (`pinocchio::BroadPhaseManager`) in the direct checker, then re-run the same 100
+   queries. The probe predicts most of the 3.3× gap closes.
+2. Run `regenerate_all.sh` once end to end (item 4) and record its runtime.
+3. Look into the keep-upright gap (58 vs 88): profile projection vs checking in the constrained
+   space, and MoveIt's exact-tolerance re-check (v0.1 hypothesis).
+
+## STATUS (v0.1, 28 Oct, kept for history)
 
 **Done (MUST list), all local, all committed and pushed to the private repo:**
 
@@ -34,9 +98,9 @@ second hidden octomap in the benchmark node, the scene-topic remap, and one eval
 pre-commit stash. Each is in NOTES.md with the commit that fixed it; all published numbers come from
 runs after the fixes (tuning and ablation note that they predate the octomap wiring fix).
 
-**Blocked — decisions needed (details below):**
+**Blocked — decisions needed (details below):** (v0.1; item 1 resolved on 29 Oct)
 
-1. CI: fix billing or make the repo public.
+1. CI: fix billing or make the repo public. RESOLVED: public, CI green.
 2. README: the Perceptyne L3 JD phrase.
 3. Approve one end-to-end `scripts/regenerate_all.sh` run (~60 min of Gazebo, > 30 min rule).
 4. Only if CI's llvmpipe cannot render the depth camera: approve a git-lfs point-cloud bag.
@@ -104,6 +168,19 @@ Details and the first (cascaded) run: CHECKPOINTS.md "v0.2 CHECKPOINT 3".
   Node.js 20** (`checkout@v4`, `setup-python@v5`, `cache@v4`, `build-push-action@v6`,
   `setup-buildx-action@v3`; the runner forces Node 24 and warns). Recommendation: protection
   requiring the CI check, and bump the actions when GitHub stops forcing.
+
+- **`regenerate_all.sh` end to end** — what: one run of every v0.1 and v0.2 number (≈ 60 min for
+  v0.1 and ≈ 50 min for v0.2 of Gazebo/timing, all under the locks). Why you: over the 20-min and 75-min
+  rules. Recommendation: run it once on a quiet machine. Blocks: only the "runtime recorded"
+  item.
+- **Three repetitions of the 100-query direct-vs-MoveIt table** — what: ≈ 85 min of Gazebo. Why
+  you: over the 75-min single-run budget. Recommendation: yes, before the README is used in an
+  interview, so the timing columns have a spread. Blocks: nothing; the table is one repetition
+  and says so.
+- **Keep the harness escape step?** — It moved the arm out of shelf contact twice in the
+  published run (after MoveIt's query-63 abort and after one direct repositioning abort).
+  Recommendation: keep it and keep reporting the aborts (they are in the table and in "where it
+  fails"). Blocks: nothing.
 
 ### v0.1 items (28 Oct)
 
