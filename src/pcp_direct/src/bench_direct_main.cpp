@@ -27,6 +27,9 @@
 #include <typeinfo>
 #include <vector>
 
+#include <geometric_shapes/shapes.h>
+#include <octomap/OcTree.h>
+#include <octomap_msgs/conversions.h>
 #include <ompl/util/RandomNumbers.h>
 #include <moveit/kinematic_constraints/utils.hpp>
 #include <moveit/moveit_cpp/moveit_cpp.hpp>
@@ -38,9 +41,11 @@
 #include <nlohmann/json.hpp>
 #include <rclcpp/rclcpp.hpp>
 
+#include "pcp_benchmark/constraints.hpp"
 #include "pcp_benchmark/metrics.hpp"
 #include "pcp_benchmark/query_generator.hpp"
 #include "pcp_direct/collision.hpp"
+#include "pcp_direct/constraint.hpp"
 #include "pcp_direct/exec.hpp"
 #include "pcp_direct/moveit_reference.hpp"
 #include "pcp_direct/planner.hpp"
@@ -73,7 +78,12 @@ struct Params
   int64_t first_query = 0;
   int64_t max_queries = -1;
   int64_t ompl_seed = 1;
-  int64_t probe_queries = 0;  ///< queries for the MoveIt validity-check probe (0 = off)
+  int64_t probe_queries = 0;        ///< queries for the MoveIt validity-check probe (0 = off)
+  std::string constraint = "none";  ///< none | orientation (keep-upright, v0.1's definition)
+  std::string scene = "boxes";      ///< boxes | octomap (move_group's map from the sim camera)
+  double octomap_timeout = 180.0;
+  double octomap_settle = 3.0;
+  double max_tilt_deg = 5.0;
 };
 
 Params loadParams(const rclcpp::Node::SharedPtr & node)
@@ -104,6 +114,11 @@ Params loadParams(const rclcpp::Node::SharedPtr & node)
   get("max_queries", p.max_queries);
   get("ompl_seed", p.ompl_seed);
   get("probe_queries", p.probe_queries);
+  get("constraint", p.constraint);
+  get("scene", p.scene);
+  get("octomap_timeout", p.octomap_timeout);
+  get("octomap_settle", p.octomap_settle);
+  get("max_tilt_deg", p.max_tilt_deg);
   for (const auto * v :
        {&p.queries_file, &p.shelf_yaml, &p.ompl_yaml, &p.joint_limits_yaml, &p.output_csv}) {
     if (v->empty()) {
@@ -287,6 +302,24 @@ nlohmann::json probeMoveItChecks(
   };
 }
 
+/// Occupied leaves of the scene's octomap (0 if none): used to wait until the map settles.
+std::size_t octomapLeaves(const planning_scene::PlanningScene & scene)
+{
+  const auto object = scene.getWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
+  if (!object || object->shapes_.empty()) {
+    return 0;
+  }
+  const auto shape = std::dynamic_pointer_cast<const shapes::OcTree>(object->shapes_[0]);
+  if (!shape || !shape->octree) {
+    return 0;
+  }
+  std::size_t n = 0;
+  for (auto it = shape->octree->begin_leafs(); it != shape->octree->end_leafs(); ++it) {
+    n += shape->octree->isNodeOccupied(*it) ? 1 : 0;
+  }
+  return n;
+}
+
 /// One row of results/bench_direct.csv. Empty strings are "not applicable / not measured".
 struct Row
 {
@@ -298,7 +331,7 @@ struct Row
   // extras (appended after the columns the brief lists)
   std::string status, plan_success, exec_success, traj_duration_s, n_waypoints, own_dense_ok,
     crossval_hits, moveit_error_code, final_err_rad, at_start, order, start_region, goal_region,
-    checks_plan, simplify_budget_s, raw_states, exec_error;
+    checks_plan, simplify_budget_s, raw_states, exec_error, max_tilt_deg;
 };
 
 const char * kHeader =
@@ -307,7 +340,7 @@ const char * kHeader =
   "max_track_err_rad,crossval_ok,commit,seed,"
   "status,plan_success,exec_success,traj_duration_s,n_waypoints,own_dense_ok,crossval_hits,"
   "moveit_error_code,final_err_rad,at_start,order,start_region,goal_region,checks_plan,"
-  "simplify_budget_s,raw_states,exec_error,ompl_seed,executed\n";
+  "simplify_budget_s,raw_states,exec_error,ompl_seed,executed,constraint,max_tilt_deg\n";
 
 std::string csvSafe(std::string s)
 {
@@ -348,31 +381,79 @@ int main(int argc, char ** argv)
     }
     const auto & joint_names = query_set.joint_names;
 
-    // Freeze MoveIt's scene once every shelf box has arrived from shelf_boxes_loader.
+    // Freeze MoveIt's scene once. Boxes: every shelf box has arrived from shelf_boxes_loader (no
+    // octomap allowed). Octomap (SHOULD): move_group's map from the sim camera has stopped
+    // changing for bench.octomap_settle seconds, as in v0.1.
     planning_scene::PlanningScenePtr scene;
+    const bool octomap_scene = p.scene == "octomap";
     const auto wait_start = std::chrono::steady_clock::now();
+    std::size_t last_leaves = 0;
+    auto stable_since = std::chrono::steady_clock::now();
     while (rclcpp::ok() && !scene) {
       {
         planning_scene_monitor::LockedPlanningSceneRO locked(psm);
         const planning_scene::PlanningSceneConstPtr & live = locked;
-        std::size_t present = 0;
-        for (const auto & b : boxes) {
-          present += live->getWorld()->hasObject(b.name) ? 1 : 0;
-        }
-        if (present == boxes.size()) {
-          scene = planning_scene::PlanningScene::clone(live);
+        if (octomap_scene) {
+          const std::size_t leaves = octomapLeaves(*live);
+          const auto now = std::chrono::steady_clock::now();
+          if (leaves != last_leaves) {
+            last_leaves = leaves;
+            stable_since = now;
+          }
+          if (
+            leaves > 0 &&
+            std::chrono::duration<double>(now - stable_since).count() >= p.octomap_settle) {
+            scene = planning_scene::PlanningScene::clone(live);
+          }
+        } else {
+          std::size_t present = 0;
+          for (const auto & b : boxes) {
+            present += live->getWorld()->hasObject(b.name) ? 1 : 0;
+          }
+          if (present == boxes.size()) {
+            scene = planning_scene::PlanningScene::clone(live);
+          }
         }
       }
-      if (
-        !scene &&
-        std::chrono::duration<double>(std::chrono::steady_clock::now() - wait_start).count() >
-          p.scene_timeout) {
-        throw std::runtime_error("shelf boxes did not arrive within bench.scene_timeout");
+      const double waited =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - wait_start).count();
+      if (!scene && waited > (octomap_scene ? p.octomap_timeout : p.scene_timeout)) {
+        throw std::runtime_error("the planning scene did not arrive / settle in time");
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
-    if (scene->getWorld()->hasObject(planning_scene::PlanningScene::OCTOMAP_NS)) {
-      throw std::runtime_error("the frozen scene contains an octomap; v0.2 runs on boxes only");
+    const bool has_octomap =
+      scene->getWorld()->hasObject(planning_scene::PlanningScene::OCTOMAP_NS);
+    if (octomap_scene != has_octomap) {
+      throw std::runtime_error("the frozen scene's octomap does not match bench.scene");
+    }
+    // The direct checker gets the SAME map: MoveIt's frozen octomap, through its message form,
+    // as one coal::OcTree. MoveIt writes a full (not binary) map into the scene message, so
+    // octomap_msgs::msgToMap (which handles both) is used rather than binaryMsgToMap.
+    std::shared_ptr<const octomap::OcTree> octree;
+    double octomap_resolution = 0.0;
+    if (octomap_scene) {
+      moveit_msgs::msg::PlanningScene msg;
+      scene->getPlanningSceneMsg(msg);
+      const auto & origin = msg.world.octomap.origin;
+      if (
+        std::abs(origin.position.x) + std::abs(origin.position.y) + std::abs(origin.position.z) >
+          1e-9 ||
+        std::abs(origin.orientation.w) < 1.0 - 1e-9) {
+        throw std::runtime_error("the octomap origin is not the identity; not supported");
+      }
+      std::unique_ptr<octomap::AbstractOcTree> abstract(
+        octomap_msgs::msgToMap(msg.world.octomap.octomap));
+      auto * tree = dynamic_cast<octomap::OcTree *>(abstract.get());
+      if (tree == nullptr) {
+        throw std::runtime_error("the scene's octomap message is not an OcTree");
+      }
+      abstract.release();
+      octree.reset(tree);
+      octomap_resolution = tree->getResolution();
+      RCLCPP_INFO(
+        kLog, "octomap for both checkers: %zu occupied leaves, resolution %.3f m", last_leaves,
+        octomap_resolution);
     }
     RCLCPP_INFO(
       kLog, "frozen MoveIt scene: %zu world objects", scene->getWorld()->getObjectIds().size());
@@ -381,7 +462,9 @@ int main(int argc, char ** argv)
     std::string srdf;
     node->get_parameter("robot_description", urdf);
     node->get_parameter("robot_description_semantic", srdf);
-    pcp_direct::CollisionChecker checker(urdf, srdf, boxes, joint_names);
+    pcp_direct::CollisionChecker checker(
+      urdf, srdf, octomap_scene ? std::vector<pcp_direct::BoxSpec>{} : boxes, joint_names, {},
+      octree);
     pcp_direct::PlannerSettings settings = pcp_direct::loadMoveItOmplSettings(p.ompl_yaml, p.group);
     settings.timeout_s = p.planning_time;
     settings.ompl_seed = static_cast<unsigned int>(p.ompl_seed);
@@ -416,6 +499,11 @@ int main(int argc, char ** argv)
       RCLCPP_INFO(kLog, "MoveIt's OMPL context: %s", moveit_ompl.dump().c_str());
     }
     const auto limits = pcp_direct::loadJointLimits(p.joint_limits_yaml, joint_names);
+    const auto constraint_type = pcp_benchmark::constraintTypeFromString(p.constraint);
+    pcp_benchmark::ConstraintSpec spec;
+    spec.link_name = p.tip_link;
+    spec.max_tilt_deg = p.max_tilt_deg;
+    const auto fk = std::make_shared<pcp_direct::FrameKinematics>(urdf, joint_names, p.tip_link);
     RCLCPP_INFO(
       kLog, "direct planner: %s, range %.3f rad, extent %.3f rad, check every %.4f rad",
       settings.planner_config.c_str(), planner.effectiveRange(), planner.maximumExtent(),
@@ -587,6 +675,20 @@ int main(int argc, char ** argv)
         reject += "direct_goal;";
       }
 
+      // Keep-upright (SHOULD): v0.1's definition on both sides. Reference yaw halfway between
+      // the start and goal yaw; per-axis rotation-vector tolerance 5 deg / sqrt(2), yaw free.
+      spec.target_yaw = pcp_benchmark::circularMean(q.start_tcp[3], q.goal_tcp[3]);
+      ompl::base::ConstraintPtr direct_constraint;
+      if (constraint_type == pcp_benchmark::ConstraintType::kOrientation) {
+        const double tol = pcp_benchmark::perAxisToleranceRad(spec.max_tilt_deg);
+        const Eigen::Matrix3d target =
+          (Eigen::AngleAxisd(spec.target_yaw, Eigen::Vector3d::UnitZ()) *
+           Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX()))
+            .toRotationMatrix();
+        direct_constraint = std::make_shared<pcp_direct::KeepUprightConstraint>(
+          fk, target, Eigen::Vector3d(tol, tol, M_PI));
+      }
+
       const bool direct_first = q.id % 2 == 0;  // alternate the order to cancel order effects
       const std::vector<std::string> order = direct_first
                                                ? std::vector<std::string>{"direct", "moveit"}
@@ -619,7 +721,7 @@ int main(int argc, char ** argv)
 
           if (pipeline == "direct") {
             const auto t0 = std::chrono::steady_clock::now();
-            const auto r = planner.plan(q.start, q.goal);
+            const auto r = planner.plan(q.start, q.goal, direct_constraint);
             plan_ok = r.success;
             row.plan_time_s = fx(r.plan_time_s);
             row.checks_plan = std::to_string(r.checks_plan);
@@ -642,6 +744,7 @@ int main(int argc, char ** argv)
           } else {
             planning.setStartState(start_state);
             planning.setGoal(goal_state);
+            planning.setPathConstraints(pcp_benchmark::buildPathConstraints(constraint_type, spec));
             moveit_cpp::PlanningComponent::PlanRequestParameters params;
             params.planner_id = settings.planner_config;
             params.planning_pipeline = p.pipeline;
@@ -675,6 +778,7 @@ int main(int argc, char ** argv)
               pcp_benchmark::computePathMetrics(model, p.group, p.tip_link, path, p.dense_step);
             row.path_len_joint_rad = fx(metrics.joint_path_rad);
             row.path_len_tcp_m = fx(metrics.tcp_path_m);
+            row.max_tilt_deg = fx(metrics.max_tilt_deg, 3);
             row.n_waypoints = std::to_string(path.size());
             // Dense re-check at bench.dense_step by both checkers; crossval = the OTHER one.
             std::size_t direct_hits = 0;
@@ -737,7 +841,8 @@ int main(int argc, char ** argv)
             << row.moveit_error_code << ',' << row.final_err_rad << ',' << row.at_start << ','
             << row.order << ',' << row.start_region << ',' << row.goal_region << ','
             << row.checks_plan << ',' << row.simplify_budget_s << ',' << row.raw_states << ','
-            << row.exec_error << ',' << p.ompl_seed << ',' << (p.execute ? 1 : 0) << '\n';
+            << row.exec_error << ',' << p.ompl_seed << ',' << (p.execute ? 1 : 0) << ','
+            << p.constraint << ',' << row.max_tilt_deg << '\n';
         csv.flush();
         ++rows;
         RCLCPP_INFO(
@@ -776,6 +881,11 @@ int main(int argc, char ** argv)
       {"max_extent_rad", planner.maximumExtent()},
       {"longest_valid_segment_rad", planner.longestValidSegment()},
       {"planning_time_s", p.planning_time},
+      {"constraint", p.constraint},
+      {"scene", p.scene},
+      {"octomap_occupied_leaves", last_leaves},
+      {"octomap_resolution_m", octomap_resolution},
+      {"max_tilt_deg", p.max_tilt_deg},
       {"sample_dt_s", p.sample_dt},
       {"goal_tolerance_rad", p.goal_tolerance},
       {"dense_step_rad", p.dense_step},

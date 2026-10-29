@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include <ompl/base/Constraint.h>
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 
 #include "pcp_direct/collision.hpp"
@@ -69,7 +70,11 @@ public:
   DirectPlanner(CollisionChecker & checker, const PlannerSettings & settings);
 
   /// Plan start -> goal (joint order of the checker). The checker's statistics are reset first.
-  PlanResult plan(const std::vector<double> & start, const std::vector<double> & goal);
+  /// With `constraint`, plan in OMPL's ProjectedStateSpace on that constraint (start and goal
+  /// must satisfy it); simplification then runs in the constrained space as well.
+  PlanResult plan(
+    const std::vector<double> & start, const std::vector<double> & goal,
+    const ompl::base::ConstraintPtr & constraint = nullptr);
 
   double maximumExtent() const;
   double longestValidSegment() const;  ///< rad (L1) between checks along a motion
