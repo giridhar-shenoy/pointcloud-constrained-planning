@@ -33,6 +33,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Docs: v0.2 README section with the fairness paragraph, a second Mermaid lane in
   `docs/architecture.md`, and a v0.2 block in `docs/results.md`.
 
+- SHOULD items: keep-upright in the direct pipeline (`KeepUprightConstraint` on
+  `ProjectedStateSpace`, `results/bench_direct_upright.csv`) and both pipelines on move_group's
+  octomap as one `coal::OcTree` (`results/bench_direct_octomap.csv`); `scripts/check_probe.sh`
+  (`results/check_probe.json`).
+
+### Fixed (v0.2)
+
+- `bench_direct` escapes from a colliding configuration before repositioning (the first full run
+  cascaded after one aborted execution; kept in `results/runs/`).
+- MoveIt's octomap is read with `octomap_msgs::msgToMap` (MoveIt writes full, not binary, maps).
+
 ### Changed (v0.2)
 
 - `pcp_benchmark` exports `pcp_benchmark_core` (additive; v0.1 outputs unchanged).
