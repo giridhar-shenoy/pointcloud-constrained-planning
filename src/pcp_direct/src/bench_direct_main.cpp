@@ -262,12 +262,19 @@ nlohmann::json probeMoveItChecks(
     return {{"error", "no ModelBasedPlanningContext"}};
   }
   auto & ss = ctx->getOMPLSimpleSetup();
+  // MoveIt caches planning contexts and its goal sampler runs in a background thread, so a
+  // counter freed after this call could still be referenced (the first version crashed after a
+  // dozen probes). Restore MoveIt's own checker afterwards and keep every counter alive.
+  static std::vector<std::shared_ptr<CountingValidityChecker>> keep_alive;
+  const auto original = ss->getStateValidityChecker();
   auto counting = std::make_shared<CountingValidityChecker>(ctx.get());
+  keep_alive.push_back(counting);
   ss->setStateValidityChecker(counting);
   planning_interface::MotionPlanResponse res;
   const auto t0 = std::chrono::steady_clock::now();
   ctx->solve(res);
   const double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+  ss->setStateValidityChecker(original);
   return {
     {"success", static_cast<bool>(res.error_code)},
     {"planning_time_s", res.planning_time},
