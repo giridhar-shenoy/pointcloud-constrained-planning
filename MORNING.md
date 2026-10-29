@@ -35,8 +35,9 @@
   (<https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40797577403>).
 - Main after the MUST merge: green
   (<https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40794749550>).
-- Main after the SHOULD merge: run 40798341717 on ee232d7 (see CHECKPOINTS.md / NOTES.md for its
-  result).
+- Main after the SHOULD merge: green, 49 gtests, smoke and agreement 50/50
+  (<https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40798341717>,
+  ee232d7). Later commits on main are docs-only (this file).
 
 **Things I got wrong tonight and fixed** (NOTES.md has each with its commit):
 
