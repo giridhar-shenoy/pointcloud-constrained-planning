@@ -538,6 +538,12 @@ REGENERATE = "\n".join(
         "| `scripts/bench_direct.sh 100 && scripts/aggregate_direct.py` |",
         "| CI mini-benchmark, 5 queries, plan only "
         "| `scripts/bench_direct.sh 5 results/tmp/ci_direct5.csv --plan-only` |",
+        "| Check-count probe, 20 queries | `scripts/check_probe.sh 20` |",
+        "| Keep-upright, both pipelines, 100 queries, plan only "
+        "| `PCP_CONSTRAINT=orientation scripts/bench_direct.sh 100 "
+        "results/bench_direct_upright.csv --plan-only` |",
+        "| Octomap scene, both pipelines, 100 queries, plan only "
+        "| `scripts/bench_direct.sh 100 results/bench_direct_octomap.csv --octomap` |",
     ]
 )
 
