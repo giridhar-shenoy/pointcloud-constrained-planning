@@ -5,8 +5,10 @@
 #include <memory>
 #include <stdexcept>
 
+#include <ompl/base/ConstrainedSpaceInformation.h>
 #include <ompl/base/PlannerTerminationCondition.h>
 #include <ompl/base/ScopedState.h>
+#include <ompl/base/spaces/constraint/ProjectedStateSpace.h>
 #include <ompl/geometric/PathGeometric.h>
 #include <ompl/geometric/SimpleSetup.h>
 #include <ompl/geometric/planners/rrt/RRTConnect.h>
@@ -87,21 +89,39 @@ double DirectPlanner::maximumExtent() const { return space_->getMaximumExtent();
 double DirectPlanner::longestValidSegment() const { return space_->getLongestValidSegmentLength(); }
 double DirectPlanner::effectiveRange() const { return effective_range_; }
 
-PlanResult DirectPlanner::plan(const std::vector<double> & start, const std::vector<double> & goal)
+PlanResult DirectPlanner::plan(
+  const std::vector<double> & start, const std::vector<double> & goal,
+  const ompl::base::ConstraintPtr & constraint)
 {
   const std::size_t n = checker_.jointNames().size();
   if (start.size() != n || goal.size() != n) {
     throw std::invalid_argument("start/goal size does not match the joint count");
   }
-  // A fresh SimpleSetup per request, like MoveIt's planning context per request.
-  ompl::geometric::SimpleSetup ss(space_);
-  auto si = ss.getSpaceInformation();
+  // A fresh SimpleSetup per request, like MoveIt's planning context per request. With a path
+  // constraint, plan in OMPL's ProjectedStateSpace over the same JointSpaceL1 (MoveIt's
+  // enforce_constrained_state_space does the same with OMPL's default delta/lambda/tolerance).
+  ompl::base::StateSpacePtr space = space_;
+  ompl::base::SpaceInformationPtr si;
+  if (constraint) {
+    auto css = std::make_shared<ompl::base::ProjectedStateSpace>(space_, constraint);
+    space = css;
+    si = std::make_shared<ompl::base::ConstrainedSpaceInformation>(css);
+  } else {
+    si = std::make_shared<ompl::base::SpaceInformation>(space_);
+  }
+  const bool constrained = static_cast<bool>(constraint);
+  auto values = [constrained](const ompl::base::State * state) -> const double * {
+    const ompl::base::State * raw =
+      constrained ? state->as<ompl::base::ConstrainedStateSpace::StateType>()->getState() : state;
+    return raw->as<ompl::base::RealVectorStateSpace::StateType>()->values;
+  };
+  ompl::geometric::SimpleSetup ss(si);
   CollisionChecker * checker = &checker_;
-  ss.setStateValidityChecker([si, checker](const ompl::base::State * state) {
+  ss.setStateValidityChecker([si, checker, values](const ompl::base::State * state) {
     if (!si->satisfiesBounds(state)) {
       return false;
     }
-    return checker->isValid(state->as<ompl::base::RealVectorStateSpace::StateType>()->values);
+    return checker->isValid(values(state));
   });
   si->setStateValidityCheckingResolution(settings_.longest_valid_segment_fraction);
   auto planner = std::make_shared<ompl::geometric::RRTConnect>(si);
@@ -109,11 +129,18 @@ PlanResult DirectPlanner::plan(const std::vector<double> & start, const std::vec
     planner->setRange(settings_.range);
   }
   ss.setPlanner(planner);
-  ompl::base::ScopedState<> s(space_);
-  ompl::base::ScopedState<> g(space_);
-  for (std::size_t j = 0; j < n; ++j) {
-    s[j] = start[j];
-    g[j] = goal[j];
+  ompl::base::ScopedState<> s(space);
+  ompl::base::ScopedState<> g(space);
+  if (constrained) {
+    s->as<ompl::base::ConstrainedStateSpace::StateType>()->copy(
+      Eigen::Map<const Eigen::VectorXd>(start.data(), static_cast<Eigen::Index>(n)));
+    g->as<ompl::base::ConstrainedStateSpace::StateType>()->copy(
+      Eigen::Map<const Eigen::VectorXd>(goal.data(), static_cast<Eigen::Index>(n)));
+  } else {
+    for (std::size_t j = 0; j < n; ++j) {
+      s[j] = start[j];
+      g[j] = goal[j];
+    }
   }
   ss.setStartAndGoalStates(s, g);
   ss.setup();
@@ -133,8 +160,7 @@ PlanResult DirectPlanner::plan(const std::vector<double> & start, const std::vec
     r.simplify_time_s = ss.getLastSimplificationTime();
     const auto & path = ss.getSolutionPath();
     for (std::size_t i = 0; i < path.getStateCount(); ++i) {
-      const double * v =
-        path.getState(i)->as<ompl::base::RealVectorStateSpace::StateType>()->values;
+      const double * v = values(path.getState(i));
       r.path.emplace_back(v, v + n);
     }
   }

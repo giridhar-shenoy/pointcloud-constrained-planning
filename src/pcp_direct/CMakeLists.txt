@@ -51,7 +51,7 @@ target_link_libraries(pcp_direct_collision PUBLIC
   Eigen3::Eigen
   yaml-cpp::yaml-cpp)
 
-add_library(pcp_direct_planner src/planner.cpp)
+add_library(pcp_direct_planner src/planner.cpp src/constraint.cpp)
 target_link_libraries(pcp_direct_planner PUBLIC pcp_direct_collision ompl::ompl yaml-cpp::yaml-cpp)
 
 add_library(pcp_direct_traj src/traj.cpp)
@@ -125,7 +125,7 @@ if(BUILD_TESTING)
     PCP_JOINT_LIMITS_YAML="${CMAKE_CURRENT_SOURCE_DIR}/config/joint_limits.yaml"
     PCP_COMMITTED_BOX_QUERIES="${CMAKE_CURRENT_SOURCE_DIR}/../../results/queries_boxes.json")
 
-  foreach(t test_collision test_planner test_traj test_queries_boxes)
+  foreach(t test_collision test_planner test_traj test_queries_boxes test_constraint)
     ament_add_gtest(${t} test/${t}.cpp TIMEOUT 300)
     target_link_libraries(${t} pcp_direct_traj pcp_benchmark::pcp_benchmark_core
       ament_index_cpp::ament_index_cpp)
