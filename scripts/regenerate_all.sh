@@ -70,5 +70,8 @@ lock gazebo scripts/record_gifs.sh results/bench.csv
 lock3 scripts/collision_agreement.sh 500
 lock3 scripts/bench_direct.sh 100
 lock3 scripts/check_probe.sh 20
+lock3 env PCP_CONSTRAINT=orientation scripts/bench_direct.sh 100 results/bench_direct_upright.csv \
+  --plan-only
+lock3 scripts/bench_direct.sh 100 results/bench_direct_octomap.csv --octomap
 python3 scripts/aggregate_direct.py
 echo "[regenerate_all] done in $(( $(date +%s) - start )) s"
