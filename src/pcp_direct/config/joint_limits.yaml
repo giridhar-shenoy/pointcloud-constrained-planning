@@ -1,0 +1,16 @@
+# Velocity and acceleration limits for the direct pipeline's trapezoidal parameterisation.
+#
+# The joint_trajectory_controller in ur_simulation_gz/config/ur_controllers.yaml has NO velocity or
+# acceleration limits (only path 0.2 rad / goal 0.1 rad tolerances), so "the limits the controller
+# is configured with" do not exist. These are the limits MoveIt's time parameterisation (TOTG)
+# uses for the same robot, so both pipelines parameterise under identical limits:
+#   max_velocity     = URDF <limit velocity> (ur_description ur5e: 180 deg/s = pi rad/s)
+#   max_acceleration = ur_moveit_config/config/joint_limits.yaml (5.0 rad/s^2)
+# A unit test checks these against MoveIt's robot model loaded with the same files.
+joint_limits:
+  shoulder_pan_joint: {max_velocity: 3.141592653589793, max_acceleration: 5.0}
+  shoulder_lift_joint: {max_velocity: 3.141592653589793, max_acceleration: 5.0}
+  elbow_joint: {max_velocity: 3.141592653589793, max_acceleration: 5.0}
+  wrist_1_joint: {max_velocity: 3.141592653589793, max_acceleration: 5.0}
+  wrist_2_joint: {max_velocity: 3.141592653589793, max_acceleration: 5.0}
+  wrist_3_joint: {max_velocity: 3.141592653589793, max_acceleration: 5.0}

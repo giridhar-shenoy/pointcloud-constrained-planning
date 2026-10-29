@@ -81,8 +81,15 @@ jobs:
       - name: Python unit tests (aggregation)
         run: $RUN_IN bash -c "python3 -m pytest -q scripts/tests"
 
-      - name: ci_smoke (sim + octomap + one RRTConnect plan, 240 s cap)
-        run: $RUN_IN bash -c "scripts/ci_smoke.sh"
+      # v0.2 adds the collision agreement (MoveIt's scene vs the direct Pinocchio/coal checker) on
+      # the first 50 of the seed-0 configurations to the smoke path; no Gazebo needed for it.
+      # It must agree on all 50 and both checkers must test the same pair set.
+      - name: ci_smoke (sim + octomap + one RRTConnect plan, 240 s cap) + collision agreement (50)
+        run: >-
+          $RUN_IN bash -c "scripts/ci_smoke.sh &&
+          scripts/collision_agreement.sh 50 results/tmp/ci_agreement50.csv 0 &&
+          python3 -c \"import json, sys; m = json.load(open('results/tmp/ci_agreement50.csv.meta.json'));
+          sys.exit(0 if m['agree'] == m['count'] == 50 and m['pair_sets_equal'] else 1)\""
 
       - name: Mini-benchmark (5 queries x {none, orientation}, < 5 min)
         timeout-minutes: 5
@@ -90,6 +97,13 @@ jobs:
           $RUN_IN bash -c "scripts/bench_planners.sh 5 results/tmp/ci_bench5.csv &&
           test \$(( \$(wc -l < results/tmp/ci_bench5.csv) - 1 )) -eq 10 &&
           python3 scripts/aggregate.py --csv results/tmp/ci_bench5.csv --print-only"
+
+      - name: Direct-vs-MoveIt mini-benchmark (5 queries, plan only, no Gazebo, < 3 min)
+        timeout-minutes: 3
+        run: >-
+          $RUN_IN bash -c "scripts/bench_direct.sh 5 results/tmp/ci_direct5.csv --plan-only &&
+          test \$(( \$(wc -l < results/tmp/ci_direct5.csv) - 1 )) -eq 10 &&
+          python3 scripts/aggregate_direct.py --csv results/tmp/ci_direct5.csv --print-only"
 
       - name: Upload sim logs on failure
         if: failure()

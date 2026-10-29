@@ -59,7 +59,13 @@ target_link_libraries(pcp_benchmark
   ${OCTOMAP_LIBRARIES}
   ompl::ompl)
 
-install(TARGETS pcp_benchmark_core generate_queries pcp_benchmark
+# pcp_benchmark_core is exported (v0.2) so that pcp_direct reuses the same query generator, robot
+# model loader and path metrics instead of copies.
+install(TARGETS pcp_benchmark_core EXPORT export_pcp_benchmark
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
+install(TARGETS generate_queries pcp_benchmark
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})
@@ -92,4 +98,7 @@ if(BUILD_TESTING)
   endforeach()
 endif()
 
+ament_export_targets(export_pcp_benchmark HAS_LIBRARY_TARGET)
+ament_export_dependencies(moveit_core moveit_msgs geometric_shapes srdfdom urdf Eigen3 nlohmann_json
+  yaml-cpp)
 ament_package()

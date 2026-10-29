@@ -1,0 +1,66 @@
+{
+  "commit": "b3a170c",
+  "dense_step_rad": 0.01,
+  "direct_active_pairs": 62,
+  "execute": true,
+  "finished_utc": "2026-10-28T23:34:02Z",
+  "first_query": 0,
+  "goal_tolerance_rad": 0.01,
+  "hardware_threads": 8,
+  "joint_limits": {
+    "max_acceleration": [
+      5.0,
+      5.0,
+      5.0,
+      5.0,
+      5.0,
+      5.0
+    ],
+    "max_velocity": [
+      3.141592653589793,
+      3.141592653589793,
+      3.141592653589793,
+      3.141592653589793,
+      3.141592653589793,
+      3.141592653589793
+    ]
+  },
+  "longest_valid_segment_fraction": 0.0003,
+  "longest_valid_segment_rad": 0.02073451151369263,
+  "max_extent_rad": 69.11503837897544,
+  "moveit_check_probe": [],
+  "moveit_collision_detector": "FCL",
+  "moveit_ompl_context": {
+    "longest_valid_segment_fraction": 0.0003,
+    "longest_valid_segment_rad": 0.02073451151369263,
+    "max_extent_rad": 69.11503837897544,
+    "motion_validator": "N4ompl4base23DiscreteMotionValidatorE",
+    "planner": "ur_manipulator/ur_manipulator[RRTConnectRange2]",
+    "range": "2",
+    "state_space": "ur_manipulator_JointModel",
+    "state_validity_checking_resolution": 0.0003
+  },
+  "ompl_seed": 1,
+  "planner_config": "RRTConnectRange2",
+  "planning_time_s": 10.0,
+  "queries_file": "/home/giri/work/r2/results/queries_boxes.json",
+  "queries_run": 100,
+  "query_seed": 0,
+  "range_from_yaml": true,
+  "range_rad": 2.0,
+  "reposition_failures": 85,
+  "repositions_attempted": 200,
+  "rows": 200,
+  "sample_dt_s": 0.1,
+  "skipped_queries": 0,
+  "total_wall_time_s": 1005.263071821,
+  "world_objects": [
+    "board_bottom",
+    "board_middle",
+    "board_top",
+    "divider",
+    "wall_back",
+    "wall_left",
+    "wall_right"
+  ]
+}

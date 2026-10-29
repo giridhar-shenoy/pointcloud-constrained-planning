@@ -7,7 +7,8 @@ ARG USERNAME=dev
 ARG USER_UID=1000
 ARG USER_GID=1000
 
-# ROS 2 Lyrical binaries the workspace needs (MoveIt 2.15, UR Gazebo sim, ros_gz bridge),
+# ROS 2 Lyrical binaries the workspace needs (MoveIt 2.15, UR Gazebo sim, ros_gz bridge; v0.2:
+# Pinocchio 4 + coal + OMPL for the direct pipeline),
 # Mesa EGL for headless ogre2 rendering of the depth camera, and the Python libs used by
 # scripts/aggregate.py.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -30,6 +31,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-lyrical-ros-gz-interfaces \
       ros-lyrical-xacro \
       ros-lyrical-ament-cmake-gtest \
+      ros-lyrical-pinocchio \
+      ros-lyrical-coal \
+      ros-lyrical-ompl \
+      ros-lyrical-control-msgs \
       python3-colcon-common-extensions \
       python3-rosdep \
       python3-matplotlib \

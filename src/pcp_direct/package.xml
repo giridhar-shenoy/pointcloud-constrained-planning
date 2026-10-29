@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>pcp_direct</name>
+  <version>0.2.0</version>
+  <description>Direct planning pipeline on the libraries (Pinocchio/coal collision checking, OMPL RRTConnect, trapezoidal parameterisation, FollowJointTrajectory execution) and its benchmark against MoveIt 2.</description>
+  <maintainer email="giridharjshenoy@gmail.com">Giridhar J Shenoy</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- The direct pipeline itself (collision, planner, traj, exec). -->
+  <depend>pinocchio</depend>
+  <depend>coal</depend>
+  <depend>ompl</depend>
+  <depend>eigen</depend>
+  <depend>yaml-cpp</depend>
+  <depend>nlohmann-json-dev</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>control_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>ament_index_cpp</depend>
+  <!-- The MoveIt reference side (agreement test, benchmark, box loader). -->
+  <depend>moveit_core</depend>
+  <depend>moveit_ros_planning</depend>
+  <depend>moveit_planners_ompl</depend>
+  <depend>moveit_msgs</depend>
+  <depend>shape_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>pcp_benchmark</depend>
+
+  <exec_depend>pcp_moveit_config</exec_depend>
+  <exec_depend>pcp_scenes</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

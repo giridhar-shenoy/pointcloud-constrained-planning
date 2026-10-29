@@ -14,6 +14,14 @@ lock() {  # lock <name> <cmd...>
   local name="$1"; shift
   if [ -d "${HOME}/work/.locks" ]; then flock "${HOME}/work/.locks/${name}.lock" "$@"; else "$@"; fi
 }
+lock3() {  # heavy, build and gazebo together, in that order (timing-sensitive runs)
+  local d="${HOME}/work/.locks"
+  if [ -d "${d}" ]; then
+    flock "${d}/heavy.lock" flock "${d}/build.lock" flock "${d}/gazebo.lock" "$@"
+  else
+    "$@"
+  fi
+}
 
 set +u
 # shellcheck disable=SC1091
@@ -25,7 +33,7 @@ set +u
 # shellcheck disable=SC1091
 source install/setup.bash
 set -u
-colcon test --packages-select pcp_scenes pcp_benchmark && colcon test-result --verbose
+colcon test --packages-select pcp_scenes pcp_benchmark pcp_direct && colcon test-result --verbose
 python3 -m pytest -q scripts/tests
 
 mkdir -p results/tmp
@@ -38,7 +46,9 @@ install/pcp_benchmark/lib/pcp_benchmark/generate_queries --urdf results/tmp/ur5e
   --srdf results/tmp/ur5e.srdf --scene src/pcp_scenes/config/shelf.yaml \
   --out results/tmp/queries_seed1.json --seed 1 --count 20
 cmp results/tmp/queries_seed1.json results/tuning/queries_seed1.json
-echo "[regenerate_all] queries.json and the tuning set regenerate byte for byte"
+# v0.2: the box-scene query set is the same generator, scene and seed (so the same bytes).
+cmp results/tmp/queries.json results/queries_boxes.json
+echo "[regenerate_all] queries.json, queries_boxes.json and the tuning set regenerate byte for byte"
 
 lock gazebo scripts/ci_smoke.sh
 # Tuning set (seed 1): how RRTConnect's range was chosen.
@@ -55,4 +65,10 @@ lock gazebo scripts/bench_octomap_resolution.sh 20 0.02 0.05
 #   git checkout 6c12eeb && scripts/bench_planners.sh 100 results/ablation/bench_lvsf0.005.csv
 python3 scripts/aggregate.py
 lock gazebo scripts/record_gifs.sh results/bench.csv
+# v0.2: collision agreement, direct vs MoveIt with execution, the check-count probe, tables.
+# Timings are published, so these take the heavy, build and gazebo locks together.
+lock3 scripts/collision_agreement.sh 500
+lock3 scripts/bench_direct.sh 100
+lock3 scripts/check_probe.sh 20
+python3 scripts/aggregate_direct.py
 echo "[regenerate_all] done in $(( $(date +%s) - start )) s"
