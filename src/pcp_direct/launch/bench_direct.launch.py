@@ -62,6 +62,7 @@ def launch_setup(context):
                 "bench.max_queries": int(lc["max_queries"]),
                 "bench.first_query": int(lc["first_query"]),
                 "bench.probe_queries": int(lc["probe_queries"]),
+                "bench.constraint": lc["constraint"],
                 "bench.shelf_yaml": share("pcp_scenes", "config", "shelf.yaml"),
                 "bench.ompl_yaml": share("pcp_moveit_config", "config", "ompl_planning.yaml"),
                 "bench.joint_limits_yaml": share("pcp_direct", "config", "joint_limits.yaml"),
@@ -106,6 +107,8 @@ ARGS = {
     # >0: before the benchmark, solve that many queries in MoveIt's own planning context with a
     # counting validity checker, and the same queries with the direct planner (meta file only).
     "probe_queries": "0",
+    # none | orientation (SHOULD: v0.1's keep-upright constraint in both pipelines)
+    "constraint": "none",
 }
 
 
