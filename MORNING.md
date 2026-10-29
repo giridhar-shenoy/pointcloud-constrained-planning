@@ -50,7 +50,65 @@ runs after the fixes (tuning and ablation note that they predate the octomap wir
    projected states, and a `range` sweep above 2 rad on the tuning set; then BiTRRT's 0/100
    unconstrained.
 
+## v0.2 CHECKPOINT 2 RESULT — collision agreement (you asked to see this before continuing)
+
+**500/500 = 100 %** of seeded uniform configurations get the same verdict from MoveIt (FCL) and the
+direct checker (coal through Pinocchio), with identical pair lists; boundary probe 180/194, all 14
+differences on forearm_link/wrist_3_link at 1–5 nm separation (below coal's 1e-6 m GJK tolerance).
+Details: CHECKPOINTS.md "v0.2 CHECKPOINT 2". Work continued per the overnight rules.
+
+## v0.2 CHECKPOINT 3 RESULT — direct vs MoveIt, 100 queries with execution (you asked to see the table before plotting)
+
+| Metric | Direct (OMPL + coal) | MoveIt 2 (MoveItCpp) | Like for like? |
+|---|---|---|---|
+| Planned (Wilson 95 %) | 100/100 = 100 % (96 %–100 %) | 100/100 = 100 % (96 %–100 %) | yes |
+| **OMPL solve + simplification**, median / p95 (s) | 0.402 / 1.039 | 0.123 / 0.274 | **yes**: MoveIt's `planning_time` is solve + simplify |
+| OMPL solve only, median / p95 (s) | 0.081 / 0.531 | inside `planning_time` | direct only |
+| Simplification, median / p95 (s) | 0.320 / 0.688 | inside `planning_time` | direct only |
+| Time parameterisation, median / p95 (s) | 0.000025 / 0.000047 | inside `plan()` (TOTG adapter) | no: trapezoid vs TOTG |
+| **Request → time-parameterised trajectory**, median / p95 (s) | 0.402 / 1.040 | 0.169 / 0.471 | **yes**: wall time, same process |
+| Validity checks per request, median / p95 | 7668 / 19644 | not exposed | direct only |
+| Collision check, median (µs) | 50.8 | 48.9 (agreement test, not in the plan) | yes (agreement test: same configurations, both with FK) |
+| Trajectory duration, median / p95 (s) | 3.85 / 6.60 | 3.14 / 5.61 | no: rest-to-rest trapezoids vs TOTG on the interpolated path |
+| Joint path length, median (rad) | 4.71 | 4.51 | yes (same metric) |
+| TCP path length, median (m) | 1.18 | 1.13 | yes (same metric) |
+| Path clean for the OTHER pipeline's checker at 0.01 rad (cross-validation) | 97/100 | 91/100 | yes |
+| Path clean for its OWN checker at 0.01 rad | 97/100 | 91/100 | yes (a failure here is a discretisation miss, not a checker disagreement) |
+| Executed and reached the goal (≤ 0.01 rad) | 100/100 = 100 % (96 %–100 %) | 99/100 = 99 % (95 %–100 %) | yes: same controller |
+| Execution time, median / p95 (sim s) | 3.87 / 6.61 | 3.18 / 5.60 | no: follows the trajectory duration; MoveIt adds its execution manager |
+| Max joint tracking error, median / p95 (rad) | 0.0330 / 0.0538 | 0.0457 / 0.0578 | yes: same controller, same measurement |
+
+Source: `results/bench_direct.csv` (200 rows, 100 queries, 0 skipped, commit `5432d60`, query seed 0, OMPL seed 1 (direct only), with execution, 10 s per plan, total wall time 28.2 min). Direct: RRTConnectRange2, range 2.00 rad, check every 0.0207 rad (extent 69.12 rad). MoveIt's configured context: range 2, check every 0.0207 rad (extent 69.12 rad).
+
+Details and the first (cascaded) run: CHECKPOINTS.md "v0.2 CHECKPOINT 3".
+
 ## WAITING FOR GIRI
+
+### v0.2 (29 Oct night) — decisions taken on my recommendation, please confirm
+
+- **D1–D5** (NOTES.md, Session 2 plan): reuse `pcp_scenes/config/shelf.yaml` as the one box file;
+  an L1 joint metric/extent in the direct OMPL space to match MoveIt's; `queries_boxes.json`
+  identical to `queries.json` (the v0.1 generator already sampled against the boxes); velocity
+  π rad/s and acceleration 5 rad/s² for both parameterisers (the JTC config has no limits); v0.1
+  `sim.launch.py` unchanged with move_group idle in the background. Work proceeds on these; if
+  you disagree, D2 and D4 change benchmark numbers, the others do not.
+
+### v0.2 — open items that need you
+
+- **README on main says "CI has not run yet"**, which is false since run 40649038811. Fix that
+  bullet on main now (docs commit) or let the v0.2 merge carry the fix? Recommendation: let the
+  merge carry it; if the merge is deferred, approve a one-line fix on main.
+- **Perceptyne L3 phrase**: no application notes are in the repo, so the README row stays
+  `TODO(Giri)`. Paste the phrase.
+- **Branch protection on main** (not set; repo settings were not touched) and **GitHub Actions on
+  Node.js 20** (`checkout@v4`, `setup-python@v5`, `cache@v4`, `build-push-action@v6`,
+  `setup-buildx-action@v3`; the runner forces Node 24 and warns). Recommendation: protection
+  requiring the CI check, and bump the actions when GitHub stops forcing.
+
+### v0.1 items (28 Oct)
+
+Items 1 (billing) and 4 (git-lfs bag) are resolved: the repo is public, CI runs, and the runner
+renders the depth camera (run 40649038811). Items 2 and 3 are still open.
 
 ### 1. GitHub Actions will not start on this private repo (billing)
 

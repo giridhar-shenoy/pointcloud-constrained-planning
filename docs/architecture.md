@@ -86,3 +86,79 @@ flowchart LR
 (−0.5, −0.6, 1.3) m looking at the shelf; the Gazebo point cloud arrives in `camera_link`
 (x forward), which was checked by transforming a live cloud into `world` (45 % of points within
 1.5 cm of a shelf box, 44 % on the floor, the rest on the arm). The octomap frame is `world`.
+
+## v0.2: the direct pipeline beside MoveIt 2
+
+Language split is unchanged: the direct pipeline (`src/pcp_direct`: collision checker, planner,
+parameterisation, executor, benchmark node, box loader, agreement test) is C++17; only
+`scripts/aggregate_direct.py` (tables and the figure) is Python.
+
+```mermaid
+flowchart LR
+  yaml[("pcp_scenes/config/shelf.yaml<br/>7 boxes")]
+  urdf[("robot_description<br/>robot_description_semantic<br/>(same strings MoveIt loads)")]
+  omplyaml[("pcp_moveit_config/config/ompl_planning.yaml<br/>RRTConnectRange2, lvsf 0.0003")]
+  limits[("pcp_direct/config/joint_limits.yaml<br/>pi rad/s, 5 rad/s^2")]
+  q[("results/queries_boxes.json<br/>seed 0, 100 queries")]
+
+  subgraph DIRECT["direct lane (pcp_direct libraries, no MoveIt)"]
+    coll["CollisionChecker<br/>Pinocchio model + GeometryModel,<br/>coal meshes + coal boxes,<br/>addAllCollisionPairs - SRDF pairs"]
+    plan["DirectPlanner<br/>SimpleSetup + RRTConnect on JointSpaceL1<br/>(MoveIt's L1 metric and extent),<br/>simplifySolution(10 s - plan time)"]
+    traj["parameterise()<br/>R1 trapezoids, rest-to-rest,<br/>-> trajectory_msgs/JointTrajectory"]
+    exe["TrajectoryExecutor<br/>FollowJointTrajectory client"]
+  end
+
+  subgraph MOVEIT["MoveIt lane (MoveItCpp in the same process, ns /pcp_direct)"]
+    loader["shelf_boxes_loader<br/>CollisionObject boxes"]
+    psm["PlanningSceneMonitor<br/>(no 3-D sensors: no octomap)<br/>frozen scene snapshot"]
+    pc["PlanningComponent::plan()<br/>OMPL pipeline + adapters + TOTG"]
+    tem["MoveItCpp::execute()<br/>TrajectoryExecutionManager"]
+  end
+
+  subgraph SIM["Gazebo (v0.1 sim.launch.py, unchanged)"]
+    jtc["joint_trajectory_controller<br/>/follow_joint_trajectory<br/>/controller_state"]
+    js["/joint_states"]
+  end
+
+  mon["tracking monitor<br/>/joint_states vs controller reference<br/>(same for both lanes)"]
+  xval["cross-validation<br/>direct path -> MoveIt checker,<br/>MoveIt path -> direct checker,<br/>0.01 rad steps"]
+  csv[("results/bench_direct.csv<br/>+ .meta.json")]
+  agg["scripts/aggregate_direct.py"]
+
+  yaml --> coll
+  yaml --> loader --> psm
+  urdf --> coll
+  urdf --> psm
+  omplyaml --> plan
+  omplyaml --> pc
+  limits --> traj
+  q --> plan
+  q --> pc
+  coll --> plan --> traj --> exe --> jtc
+  psm --> pc --> tem --> jtc
+  jtc --> js --> mon
+  jtc --> mon
+  plan --> xval
+  pc --> xval
+  coll --> xval
+  psm --> xval
+  xval --> csv
+  mon --> csv
+  exe --> csv
+  tem --> csv
+  csv --> agg
+```
+
+- **One process, one scene.** `bench_direct` hosts both lanes. MoveIt plans on a clone of its
+  planning scene taken once all seven boxes have arrived from `shelf_boxes_loader`; the direct
+  checker is built from the same URDF/SRDF strings and the same YAML. A scene with an octomap is
+  refused.
+- **Settings are read, then verified.** The direct planner reads MoveIt's `ompl_planning.yaml`;
+  the node aborts if MoveIt's loaded parameters differ, and records the OMPL context MoveIt
+  actually configures (extent, check spacing, range) in the `.meta.json`.
+- **Same controller, same measurement.** Both lanes end at the sim's
+  `joint_trajectory_controller`; tracking error for both is `/joint_states` against the
+  controller's own reference (`controller_state`), matched by stamp. Before every run the direct
+  planner moves the arm to that run's start; the order of the two lanes alternates per query.
+- **Agreement test** (`collision_agreement`, no Gazebo): the same MoveItCpp scene and direct checker,
+  500 seeded uniform configurations plus a boundary probe.

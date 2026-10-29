@@ -273,3 +273,227 @@ in the repo standard's list (feat/fix/docs/ci/test/chore/refactor). History is n
   (checkout, setup-python, cache, build-push-action, setup-buildx-action) target Node.js 20 and
   are forced onto Node.js 24 by the runner. Left unchanged; listed as an open question.
 - Commands: `gh run watch 40649038811 --exit-status` (exit 0), `gh run view 40649038811 --log`.
+
+## Session 2 — 2026-10-29, v0.2 "direct pipeline" (SPRINT OVERRIDE v0.2)
+
+Environment for every shell: `export ROS_DOMAIN_ID=12 GZ_PARTITION=r2 MAKEFLAGS=-j4`; builds under
+`flock ~/work/.locks/build.lock`, Gazebo under `flock ~/work/.locks/gazebo.lock timeout <s>`.
+All v0.2 work is on branch `feat/direct-pipeline`; v0.1 code is reused, not edited.
+
+### Plan (numbered as in the override; CHECKPOINTs in bold)
+
+0. CI green on main (done before this plan; see "Step 0" above). Branch `feat/direct-pipeline`.
+   **CHECKPOINT 1.**
+1. `src/pcp_direct` (ament_cmake, C++17, Eigen). Libraries with no MoveIt dependency:
+   `pcp_direct_collision`, `pcp_direct_planner`, `pcp_direct_traj`, `pcp_direct_exec`.
+   Executables that link MoveIt only to act as the reference: `collision_agreement`,
+   `bench_direct`, plus the `shelf_boxes_loader` node.
+2. Collision module (`collision.hpp/.cpp`):
+   - `pinocchio::urdf::buildModelFromXML` + `buildGeom(..., COLLISION, ...)` on the same URDF string
+     MoveIt loads (`ur5e_rgbd.urdf.xacro` expanded; collision meshes are ur_description's STLs).
+   - Shelf boxes as `coal::Box` GeometryObjects on the universe joint, from
+     `pcp_scenes/config/shelf.yaml` (see decision D1: that file already is the single box
+     definition the Gazebo world is generated from; a second `shelf_boxes.yaml` would be a copy).
+   - `addAllCollisionPairs()`, then `pinocchio::srdf::removeCollisionPairsFromXML` with the SRDF
+     MoveIt loads (xacro of `ur.srdf.xacro name:=ur`).
+   - Pair sets (corrected after reading the sources, see "Source facts" below): Pinocchio never
+     pairs two geometries on the same joint, so universe-fixed geometries (base, ground_plane,
+     shelf boxes) are never paired with each other; MoveIt's planner sends `group_name =
+     ur_manipulator`, and FCL skips every pair in which neither object moves with the group.
+     The two rules select the same pairs here, so nothing is added by hand; a unit test checks
+     that the active pair count equals the count derived from MoveIt's ACM and group links. The
+     agreement test uses the same `group_name` request as MoveIt's OMPL validity checker.
+   - `isValid(q)`: bounds + `computeCollisions(..., stopAtFirstCollision=true)`; counts calls and
+     records per-call time; `collidingPairs(q)` and `minDistance(q)` for the agreement report.
+   - Padding 0 on both sides (MoveIt default; checked that pcp_moveit_config sets none).
+   - gtests: home configuration free; a known self-colliding configuration; a configuration with
+     a link inside a shelf box; SRDF-disabled pair count; active pair count == MoveIt's.
+3. `shelf_boxes_loader` node: publishes the same YAML as `moveit_msgs/CollisionObject` boxes to the
+   bench/agreement node's planning-scene monitor (own namespace, so move_group's scene in the sim
+   is untouched).
+4. Agreement test `collision_agreement` (+ `launch/agreement.launch.py`, no Gazebo):
+   MoveItCpp's planning-scene monitor (no `sensors_3d`, so no octomap updater) with the boxes from
+   the loader vs the direct checker, on 500 seeded uniform configurations; both checkers timed per
+   call. `results/collision_agreement.csv` keeps every row (q, verdicts, colliding pairs from each,
+   min distance from each); docs/results.md gets the paragraph. Nothing is tuned to raise agreement.
+   **CHECKPOINT 2** (unit tests, CSV, agreement %).
+5. Direct planner (`planner.hpp/.cpp`): 6-D real-vector joint space with URDF bounds, SimpleSetup,
+   the collision module as validity checker, RRTConnect, 10 s, `simplifySolution(budget)`.
+   Settings are READ from `pcp_moveit_config/config/ompl_planning.yaml` (default planner config of
+   `ur_manipulator`, its `range`, and `longest_valid_segment_fraction`) so they cannot drift.
+   Decision D2 (metric) below. Records plan time, simplify time, validity checks, median check time.
+6. Queries `results/queries_boxes.json`: seed 0, 100 queries, v0.1 generator on the box shelf; gtest
+   regenerates it byte for byte; every start/goal validated by both checkers at run time, rejected
+   queries skipped and counted (decision D3).
+7. Time parameterisation (`traj.hpp/.cpp`): R1's header-only trapezoidal generator copied into
+   `include/pcp_direct/traj/trapezoidal.hpp` with an origin comment; limits from
+   `pcp_direct/config/joint_limits.yaml` (decision D4); output `trajectory_msgs/JointTrajectory`
+   sampled with the 1/3-rule phase boundaries included. gtests: limits respected, waypoints hit,
+   durations.
+8. Execution (`exec.hpp/.cpp`): FollowJointTrajectory client on `/joint_trajectory_controller`;
+   MoveIt side `MoveItCpp::execute()` (trajectory execution manager, same controller). Both record
+   sim-time duration, max tracking error = |/joint_states − controller reference| (reference from
+   the JTC's `controller_state`, matched by stamp, the same for both pipelines), success = action
+   SUCCEEDED and final error ≤ 0.01 rad. After every execution the direct planner moves the arm to
+   the next run's start; failures to return are counted.
+9. Cross-validation: every direct path densified to 0.01 rad and checked by MoveIt's scene; every
+   MoveIt path by the direct checker (`crossval_ok`), plus each pipeline's own dense check.
+10. `bench_direct` + `scripts/bench_direct.sh` (100 queries × {direct, moveit} × RRTConnect ×
+    unconstrained × 1 rep; `execute:=false` mode for CI). CSV columns exactly as in the override,
+    extras appended at the end. **Dry run 5 queries (needs Gazebo: ask first), project the total,
+    CHECKPOINT 3; full run only on Giri's go (Friday 20:00 IST).**
+11. `scripts/aggregate_direct.py`: median/p95 per column, Wilson 95 % for success, paired
+    log-log scatter of planning time; tables into docs/results.md.
+12. README section, fairness paragraph, "where it fails" items, architecture lane, CHANGELOG.
+13. CI on the branch: collision + query-determinism gtests, 5-query plan-only mini-benchmark
+    (no Gazebo, < 3 min), agreement on 50 configurations in the ci_smoke step. Merge only if CI is
+    green and the 100-query table exists, and only after asking; else defer by Saturday 12:00 IST.
+    **CHECKPOINT 4.**
+14. SHOULD (only after MUST is green): keep-upright via `ompl::base::Constraint` +
+    `ProjectedStateSpace`; shared octomap as one `coal::OcTree`.
+
+### Decisions to confirm (D1–D5)
+
+- D1 boxes file: reuse `src/pcp_scenes/config/shelf.yaml` (already the one definition used by the
+  Gazebo world and the v0.1 generator) instead of adding `config/shelf_boxes.yaml`.
+- D2 metric: MoveIt's joint state space measures distance as the SUM of per-joint distances (L1)
+  and its extent as the SUM of joint ranges (69.1 rad); OMPL's plain `RealVectorStateSpace` uses
+  the Euclidean norm (extent 28.8 rad). With the same `longest_valid_segment_fraction` (0.0003) and
+  `range` (2 rad) the plain space would check every 0.0086 rad (L2) instead of every 0.021 rad
+  (L1) and take differently sized RRT steps. Plan: subclass `RealVectorStateSpace` and override only
+  `distance()` and `getMaximumExtent()` to MoveIt's definitions, so the same numbers mean the same
+  thing. Plain L2 run kept as an ablation only if time allows.
+- D3 queries: the v0.1 generator already sampled against the shelf BOXES (padded 3 cm), not the
+  octomap, so seed 0 regenerates a `queries_boxes.json` byte-identical to `queries.json`. Keep it
+  that way (separate file name per table, identical content, both determinism-tested).
+- D4 limits: `joint_trajectory_controller` in `ur_simulation_gz/config/ur_controllers.yaml` has no
+  velocity/acceleration limits (only path 0.2 rad / goal 0.1 rad tolerances). MoveIt's TOTG uses
+  the URDF velocity (π rad/s) and `ur_moveit_config` acceleration (5 rad/s²); the direct
+  pipeline's `joint_limits.yaml` uses exactly those, so both parameterisers share limits.
+- D5 sim: `scripts/with_sim.sh` + v0.1 `sim.launch.py` unchanged (move_group keeps building its
+  octomap in the background; v0.2 does not read its scene). Both pipelines share that background
+  load.
+
+### Source facts that shape v0.2 (read from tags moveit2 2.15.2, ompl 2.0.2, pinocchio v4.1.0, coal v3.0.3)
+
+Read-only research by a sub-agent (shallow clones of the exact tags, installed headers diffed
+against them); the items below are the ones the code depends on. File:line refs are in the tags.
+
+- MoveIt `res.planning_time` = OMPL solve time + simplification time; interpolation and the
+  response adapters (TOTG) are outside it (`model_based_planning_context.cpp` 453-461). The
+  simplifier gets `allowed_planning_time − plan time` with `atLeastOnce=true`.
+- After simplification MoveIt interpolates the path to every state the motion validator checks
+  (`pg.interpolate()`, `validSegmentCount` per segment); `max_solution_segment_length` is never
+  set in 2.15. TOTG then runs on that dense path.
+- MoveIt's joint space: distance = Σ|Δq| (distance factor 1 per revolute joint), extent = Σ ranges,
+  linear interpolation (`joint_model_group.cpp` 455-490, `revolute_joint_model.cpp`). OMPL
+  `RealVectorStateSpace`: L2 distance, extent = diagonal norm. → decision D2.
+- `longest_valid_segment_fraction` is set through `SpaceInformation::params()` and ends in
+  `StateSpace::setLongestValidSegmentFraction`, i.e. the same call as
+  `setStateValidityCheckingResolution`. `range` is set through the planner params and compared with
+  the space's own distance.
+- Motion validator: OMPL's default `DiscreteMotionValidator` (checks the end state, then bisects
+  the interior states; the start is assumed valid).
+- Validity checker (unconstrained): bounds → (no path constraints) → `checkCollision` with
+  `group_name` set, no contacts, no distance; world check first, then self check with the ACM.
+- Default collision detector is FCL; meshes are `fcl::BVHModel<OBBRSS>`; padding 0, scale 1 unless
+  `robot_description_planning.default_robot_padding/scale` are set (they are not here).
+- Pinocchio `addAllCollisionPairs` keeps a pair iff the two `parentJoint`s differ;
+  `removeCollisionPairsFromXML` handles `<disable_collisions>` only, mapping link names to BODY
+  frames (fixed-joint merges handled). coal meshes are `BVHModel<OBBRSS>`; `security_margin` 0;
+  Pinocchio sets `distance_upper_bound = security_margin + 1e-6`.
+- Pinocchio 4.1 `GeometryObject(name, parent_joint, parent_frame, placement, geometry)`; the old
+  argument order is deprecated. `coal::Box(x, y, z)` takes full side lengths.
+- MoveItCpp `PlanRequestParameters` defaults to 5 parallel attempts with hybridization when loaded
+  from parameters; v0.1 and v0.2 set `planning_attempts = 1` explicitly.
+- MoveIt's goal is a `GoalLazySamples` (background sampling thread) on a joint goal with
+  tolerance DBL_EPSILON; the direct planner uses a plain goal state.
+- `ompl::RNG::setSeed` does not seed MoveIt's state sampler (it uses
+  `random_numbers::RandomNumberGenerator`), so MoveIt plans are not seed-reproducible.
+- OMPL 2.0: `PathSimplifier::shortcutPath` was renamed `partialShortcutPath`; the SimpleSetup,
+  RRTConnect, SpaceInformation and RealVector headers used here are otherwise unchanged from 1.6.
+- The expanded URDF has no `<safety_controller>`, so MoveIt's joint bounds equal the `<limit>`
+  values Pinocchio reads (±2π, elbow ±π); a test asserts it.
+
+### Progress log (session 2, overnight)
+
+- 02:37 Checkpoint 1 logged (overnight mode: no waiting). 02:59 Checkpoint 2 logged.
+- Collision module + 8 gtests pass first time; active pairs = MoveIt's checked pairs (62 = 62);
+  SRDF removes 7 geometry pairs (4 of its 11 entries involve links without geometry).
+- Build gotcha: Pinocchio's CMake config loads eigenpy's own FindBoost, which leaves
+  `Boost_USE_DEBUG_RUNTIME` set; MoveIt's later `find_package(Boost COMPONENTS chrono)` then
+  rejects the release libraries. Fix: find pinocchio/coal last and `unset(Boost_USE_DEBUG_RUNTIME)`.
+- Build gotcha: `moveit_planners_ompl` 2.15.2 exports `include/moveit_planners_ompl` as an
+  include dir, which does not exist (headers are in `include/moveit_planners`) → CMake generate
+  error. bench_direct links `libmoveit_ompl_interface` + that header dir directly.
+- MoveItCpp needs `planning_pipelines.pipeline_names: [ompl]` as a parameter (pcp_benchmark's
+  YAML has it; the agreement launch failed without it).
+- Agreement timing must include forward kinematics on both sides (MoveIt's OMPL checker sets the
+  state and updates transforms per check); first version timed MoveIt without FK.
+- Agreement: 500/500, identical pair lists, identical min distances; boundary probe 180/194, all
+  14 on forearm/wrist_3 at 1–5 nm (coal says contact, FCL says free). Commit 4412768.
+- 03:09 the session was killed by systemd-oomd during a `-j4` build (swap full, three sessions).
+  No committed work lost; uncommitted exec/bench files were complete on disk. From 03:35 builds
+  run `MAKEFLAGS=-j2 colcon build --parallel-workers 1` after waiting for ≥ 5 GB MemAvailable.
+- Plan-only smoke (3 queries, no Gazebo) works: all cross-checks clean. **Finding:** with the
+  same OMPL code, the direct simplifier takes 0.33–0.45 s against MoveIt's 0.06–0.13 s, and the
+  direct RRTConnect creates states more slowly; per-check cost differs only 1.3× (agreement
+  test). Hypothesis: MoveIt checks fewer states, i.e. its effective check spacing is not the
+  0.021 rad derived from the formula. bench_direct now reads MoveIt's configured OMPL context
+  (extent, longest valid segment, range, validator) and records it in the meta file instead of
+  assuming it.
+- **Hypothesis rejected (04:20):** MoveIt's configured OMPL context, read from the context
+  `plan()` builds, is identical to the direct planner's: extent 69.115 rad, longest valid segment
+  0.02073 rad (fraction 0.0003), RRTConnect range 2, `DiscreteMotionValidator`. The "same
+  settings" claim is now measured (recorded in every bench_direct `.meta.json`).
+- **Where the time goes (probe, 3 dev queries):** MoveIt's planner core makes about as many
+  validity checks as the direct planner (9.4k vs 10.3k, 10.8k vs 11.2k, 7.9k vs 6.3k) but each
+  costs 9–21 µs inside MoveIt's planner vs 50–70 µs in the direct one. Explanation (not yet
+  profiled): Pinocchio's `computeCollisions` runs coal's narrow phase on every one of the 62
+  active pairs per check, while MoveIt's FCL environment culls pairs with an AABB-tree broadphase
+  and only runs the narrow phase on overlapping bounding volumes. The agreement microbenchmark
+  (random configurations, 69 % colliding → early exit, cold caches) understates the gap (49 vs
+  61 µs). Next step (not this week): `pinocchio::BroadPhaseManager` / coal broadphase in the
+  direct checker. The first probe version wrapped MoveIt's checker generically and segfaulted:
+  MoveIt static-casts the space's validity checker to `ompl_interface::StateValidityChecker`, so
+  the counter subclasses that type.
+- **Gazebo execution check (2 queries, 04:27, gazebo lock):** both pipelines execute at full
+  speed (π rad/s, 5 rad/s²) without aborts; max tracking error 0.034–0.054 rad, final error
+  < 0.0005 rad, 0/4 repositioning failures, 55 s. v0.1's "needs 15× slow-down" was about
+  replaying TOTG trajectories that clipped the shelf; at these limits the controller tracks.
+  So decision D6 (common scaling) is not needed. MoveIt's query-0 trajectory failed the dense
+  0.01 rad re-check with BOTH checkers (TOTG blends between validated waypoints), as in v0.1.
+- **Commit hygiene slips (not rewritten):** dd23b65 also contains the executor
+  (`exec.hpp/.cpp`) because the hook aborted its own commit; d6cafb2 also contains the CI and
+  Dockerfile changes, staged during an earlier aborted commit. From now on `git reset` before
+  staging each commit.
+- Dry run (5 queries, all three locks) 04:45: 10/10, projection 26 min → full run 04:47.
+- **Full run 1 (04:47–05:04, commit b3a170c) — kept, not published as the table:**
+  `results/runs/bench_direct_run1_no_recovery.csv`. All 200 plans succeeded; executions were
+  fine for queries 0–56, then at query 57 MoveIt's executed trajectory hit the physical shelf in
+  Gazebo (its TOTG-blended path fails the dense 0.01 rad re-check with BOTH checkers), the
+  controller aborted on its 0.2 rad path tolerance with the arm 1.84 rad from the goal and in
+  contact, and my harness could not reposition from a colliding configuration ("Invalid
+  start"), so every later run reports "arm not at the query start" (85/200 repositioning
+  failures). The trigger is a real MoveIt result; the cascade is a harness bug. Fix: an escape
+  step (sample the nearest collision-free configuration with ≥ 5 mm clearance at growing radii,
+  move there in a straight line, then plan). The approved 100-query run is repeated with it.
+- The check-cost probe crashed once (SIGSEGV, intermittent; the same binary completed it twice
+  before and after). The chain now retries it once.
+- **Full run 2 (05:19–05:47, commit 5432d60) = the published table** (`results/bench_direct.csv`,
+  3e8b566): both 100/100 planned; executed to the goal direct 100/100, MoveIt 99/100 (query 63:
+  path clean on both dense checks, but the arm lagged 0.207 rad > the 0.2 rad path tolerance →
+  ABORTED, arm in contact → escape 0.010 rad). One direct REPOSITIONING move (q91 → q92 start)
+  aborted the same way (escape 0.009 rad). 2 escapes, 0 failures. Solve + simplify median
+  0.402 s vs 0.123 s (paired ratio 3.25, direct faster on 0/100); request → trajectory 0.402 s
+  vs 0.169 s; MoveIt's `plan()` wall minus `planning_time` = 0.048 s median. Simplification >
+  solve on 93/100 direct plans. Dense 0.01 rad re-checks: 97/100 direct and 91/100 MoveIt
+  clean, and cross-validation equals the own-checker result on every row → no checker
+  disagreement along any path; all misses are discretisation.
+- **Probe (`scripts/check_probe.sh 20`, 7560eec):** checks per request median 9,564 direct vs
+  8,768 MoveIt; median check 48.6 µs vs 12.4 µs; checker share of solve + simplify 99.6 % vs
+  92.5 %. Two crash modes when one process probed many queries (SIGSEGV; then
+  `free(): invalid pointer` even after restoring MoveIt's checker and keeping counters alive):
+  reusing MoveIt's cached planning context after swapping its checker is not safe, so the
+  script runs one query per process.
+- Commit-message slip: 3e8b566 says "one escape"; the meta file counts 2 (above).

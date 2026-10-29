@@ -6,6 +6,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (v0.2, branch `feat/direct-pipeline`)
+
+- `pcp_direct` (C++17): a second planning pipeline written directly on the libraries.
+  - Collision checker: Pinocchio model + coal collision meshes from the same `robot_description`,
+    the shelf boxes as coal boxes, `addAllCollisionPairs` minus the SRDF's disabled pairs. It
+    tests the same 62 pairs as MoveIt's OMPL validity checker (unit-tested).
+  - Planner: OMPL `SimpleSetup` + RRTConnect in `JointSpaceL1`, a `RealVectorStateSpace` with
+    MoveIt's L1 joint metric and summed extent. Settings are read from
+    `pcp_moveit_config/config/ompl_planning.yaml`; simplification uses MoveIt's budget rule.
+  - Time parameterisation with R1's trapezoidal profile generator (copied, see THIRD_PARTY.md) into
+    a `JointTrajectory`; `config/joint_limits.yaml` holds the limits MoveIt's TOTG uses.
+  - FollowJointTrajectory executor, and a tracking monitor (`/joint_states` vs the controller's
+    reference) used for both pipelines.
+  - `shelf_boxes_loader` (YAML → `CollisionObject`) and `collision_agreement` (MoveIt's planning
+    scene vs the direct checker on seeded configurations, plus a contact-boundary probe).
+  - `bench_direct`: both pipelines on the same queries, frozen box scene, settings and controller,
+    with dense cross-validation by the other pipeline's checker. It records MoveIt's configured
+    OMPL context, and can optionally probe MoveIt's validity-check counts.
+- `results/queries_boxes.json` (seed 0; identical to `queries.json`, determinism-tested),
+  `results/collision_agreement*.csv`.
+- Scripts: `collision_agreement.sh`, `bench_direct.sh` (plan-only or with Gazebo execution),
+  `aggregate_direct.py` (+ tests).
+- CI: pcp_direct gtests, collision agreement on 50 configurations in the smoke step, and a 5-query
+  plan-only direct-vs-MoveIt mini-benchmark.
+- Docs: v0.2 README section with the fairness paragraph, a second Mermaid lane in
+  `docs/architecture.md`, and a v0.2 block in `docs/results.md`.
+
+### Changed (v0.2)
+
+- `pcp_benchmark` exports `pcp_benchmark_core` (additive; v0.1 outputs unchanged).
+- `scripts/aggregate.py` keeps the v0.2 block in `docs/results.md` when it regenerates.
+- Dockerfile installs Pinocchio, coal, OMPL and control_msgs.
+
 ### Added
 
 - Repository skeleton: MIT license, Dockerfile on `ros:lyrical-ros-base`, devcontainer, GitHub
