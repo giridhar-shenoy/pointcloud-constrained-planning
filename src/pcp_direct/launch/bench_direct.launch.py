@@ -32,6 +32,7 @@ def share(pkg, *parts):
 
 def launch_setup(context):
     execute = LaunchConfiguration("execute").perform(context).lower() == "true"
+    octomap = LaunchConfiguration("scene").perform(context) == "octomap"
     params = build_moveit_config().to_dict()
     # No sensors: MoveItCpp's monitor would otherwise build its own octomap from the camera.
     params = {k: v for k, v in params.items() if k not in ("sensors", "camera_points")}
@@ -54,7 +55,7 @@ def launch_setup(context):
             params,
             share("pcp_direct", "config", "bench_direct.yaml"),
             {
-                "use_sim_time": execute,
+                "use_sim_time": execute or octomap,
                 "bench.execute": execute,
                 "bench.queries_file": lc["queries_file"],
                 "bench.output_csv": lc["output_csv"],
@@ -63,6 +64,7 @@ def launch_setup(context):
                 "bench.first_query": int(lc["first_query"]),
                 "bench.probe_queries": int(lc["probe_queries"]),
                 "bench.constraint": lc["constraint"],
+                "bench.scene": lc["scene"],
                 "bench.shelf_yaml": share("pcp_scenes", "config", "shelf.yaml"),
                 "bench.ompl_yaml": share("pcp_moveit_config", "config", "ompl_planning.yaml"),
                 "bench.joint_limits_yaml": share("pcp_direct", "config", "joint_limits.yaml"),
@@ -71,6 +73,9 @@ def launch_setup(context):
         remappings=[
             # MoveIt's current-state monitor and the direct executor read the sim's joints.
             ("joint_states", "/joint_states"),
+            # Octomap scene (SHOULD): receive move_group's maintained scene, octomap included, as
+            # v0.1's benchmark does. Boxes scene: this topic stays private (no publisher).
+            ("planning_scene", "/monitored_planning_scene" if octomap else "planning_scene"),
             # MoveIt's simple controller manager resolves its action client relative to the
             # node namespace; point it at the controller the sim already runs.
             (
@@ -89,7 +94,7 @@ def launch_setup(context):
     )
     return [
         bench,
-        loader,
+        *([] if octomap else [loader]),
         RegisterEventHandler(
             OnProcessExit(target_action=bench, on_exit=[EmitEvent(event=Shutdown())])
         ),
@@ -109,6 +114,8 @@ ARGS = {
     "probe_queries": "0",
     # none | orientation (SHOULD: v0.1's keep-upright constraint in both pipelines)
     "constraint": "none",
+    # boxes | octomap (SHOULD: plan both pipelines on move_group's octomap from the sim camera)
+    "scene": "boxes",
 }
 
 

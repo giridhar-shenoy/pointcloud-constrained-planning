@@ -341,6 +341,41 @@ def upright_table(rows: list[dict], meta: dict) -> str:
     return "\n".join(lines) + "\n\n" + source
 
 
+def octomap_table(rows: list[dict], meta: dict) -> str:
+    """SHOULD item: both pipelines on move_group's octomap (one frozen map, plan only)."""
+    sm = summarise(rows)
+    lines = [
+        "| Octomap scene, plan only | " + " | ".join(LABEL[p] for p in PIPELINES) + " |",
+        "|---|---|---|",
+        "| Planned (Wilson 95 %) | "
+        + " | ".join(
+            frac(sm[p]["planned"], sm[p]["attempted"], sm[p]["planned_ci"]) for p in PIPELINES
+        )
+        + " |",
+        "| OMPL solve + simplification, median / p95 (s) | "
+        + " | ".join(mp(sm[p]["plan_plus_simplify_s"]) for p in PIPELINES)
+        + " |",
+        "| Collision check, median (µs) | "
+        + f(sm["direct"]["check_time_us_median"]["median"], 1)
+        + " | not exposed |",
+        "| Path clean for the other pipeline's checker / its own (0.01 rad) | "
+        + " | ".join(
+            f"{sm[p]['crossval_ok']} / {sm[p]['own_dense_ok']} of {sm[p]['planned']}"
+            for p in PIPELINES
+        )
+        + " |",
+    ]
+    skipped = len(sm["skipped_queries"])
+    source = (
+        f"Source: `{meta.get('csv', '')}` ({len(rows)} rows, {skipped} queries skipped because "
+        f"a start or goal collides with the map for either checker, commit `{meta['commit']}`, "
+        f"{meta.get('octomap_occupied_leaves', '?')} occupied "
+        f"{100 * meta.get('octomap_resolution_m', 0):.0f} cm leaves, total wall time "
+        f"{meta['total_wall_time_s'] / 60:.1f} min)."
+    )
+    return "\n".join(lines) + "\n\n" + source
+
+
 def probe_table(probe: list[dict]) -> str:
     """Where the planning time goes: MoveIt's planner core (its own planning context with a
     counting validity checker) vs the direct planner, on the same queries."""
@@ -513,6 +548,7 @@ def main() -> int:
     ap.add_argument("--agreement", default="results/collision_agreement.csv")
     ap.add_argument("--probe", default="results/check_probe.json")
     ap.add_argument("--upright", default="results/bench_direct_upright.csv")
+    ap.add_argument("--octomap", default="results/bench_direct_octomap.csv")
     ap.add_argument("--no-plots", action="store_true")
     ap.add_argument("--print-only", action="store_true")
     args = ap.parse_args()
@@ -534,6 +570,11 @@ def main() -> int:
         umeta = json.loads((REPO / (args.upright + ".meta.json")).read_text())
         umeta["csv"] = args.upright
         upright = upright_table(load(upright_path), umeta)
+    octo = "Not run."
+    if (REPO / (args.octomap + ".meta.json")).exists():
+        ometa = json.loads((REPO / (args.octomap + ".meta.json")).read_text())
+        ometa["csv"] = args.octomap
+        octo = octomap_table(load(REPO / args.octomap), ometa)
     probe_meta_path = REPO / args.probe
     probe = (
         json.loads(probe_meta_path.read_text()).get("moveit_check_probe", [])
@@ -602,6 +643,16 @@ R_tool^T R_target with per-axis dead bands, co-dimension 3, as MoveIt formulates
 `enforce_constrained_state_space`. Plan only, same queries.
 
 {upright}
+
+### Both pipelines on move_group's octomap (SHOULD)
+
+The direct checker reads the octomap MoveIt built from the simulated camera (`world.octomap` of
+the frozen scene, `octomap_msgs::binaryMsgToMap`) as one `coal::OcTree`, so both pipelines plan on
+the identical map and the v0.1 query set (`queries.json` = `queries_boxes.json`) is reused.
+Plan only, unconstrained (`scripts/bench_direct.sh 100 results/bench_direct_octomap.csv
+--octomap`).
+
+{octo}
 
 ### Collision agreement (MoveIt's planning scene vs the direct checker)
 
