@@ -37,7 +37,12 @@
   (<https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40794749550>).
 - Main after the SHOULD merge: green, 49 gtests, smoke and agreement 50/50
   (<https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40798341717>,
-  ee232d7). Later commits on main are docs-only (this file).
+  ee232d7).
+- Main after the last code change (2f4f95d: the like-for-like check-cost row in
+  `aggregate_direct.py`, regenerated tables, this status): green, 49 gtests
+  (<https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/runs/40800085299>).
+  Every later run on main:
+  <https://github.com/giridhar-shenoy/pointcloud-constrained-planning/actions/workflows/ci.yml?query=branch%3Amain>.
 
 **Things I got wrong tonight and fixed** (NOTES.md has each with its commit):
 
