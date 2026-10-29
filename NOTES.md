@@ -497,3 +497,11 @@ against them); the items below are the ones the code depends on. File:line refs 
   reusing MoveIt's cached planning context after swapping its checker is not safe, so the
   script runs one query per process.
 - Commit-message slip: 3e8b566 says "one escape"; the meta file counts 2 (above).
+- **SHOULD keep-upright run (06:05–06:21, commit 1d8e13a, plan only, all three locks):** direct
+  58/100 vs MoveIt 88/100; solve + simplify median 4.0 s vs 1.0 s; worst tilt 1.8° vs 3.2°.
+  Dry run projected 17.9 min (budget 20); actual 16.3 min.
+- **Slip (mine):** I edited `scripts/bench_direct.sh` (the `--octomap` branch) while that run was
+  executing the script; bash reads scripts incrementally and hit a syntax error after the node had
+  finished cleanly, so the final `.partial` → CSV rename did not run. The node's CSV and meta were
+  complete (200 rows, `done:` logged); I did the two `mv`s by hand. Rule restated: never edit a
+  script that a running job executes (NOTES session 1 already said so).
