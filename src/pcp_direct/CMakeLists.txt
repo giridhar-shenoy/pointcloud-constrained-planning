@@ -33,6 +33,8 @@ find_package(moveit_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(pcp_benchmark REQUIRED)
+find_package(octomap REQUIRED)
+find_package(octomap_msgs REQUIRED)
 # Pinocchio last: its config pulls in eigenpy's own FindBoost module, which leaves
 # Boost_USE_DEBUG_RUNTIME set and makes later Boost component lookups (MoveIt's) fail.
 find_package(pinocchio REQUIRED)
@@ -48,6 +50,7 @@ target_link_libraries(pcp_direct_collision PUBLIC
   pinocchio::pinocchio_parsers
   pinocchio::pinocchio_collision
   coal::coal
+  ${OCTOMAP_LIBRARIES}
   Eigen3::Eigen
   yaml-cpp::yaml-cpp)
 
@@ -89,6 +92,7 @@ target_link_libraries(bench_direct
   pcp_direct_exec
   pcp_benchmark::pcp_benchmark_core
   ${MOVEIT_OMPL_INTERFACE_LIBRARY}
+  ${octomap_msgs_TARGETS}
   rclcpp::rclcpp
   moveit_ros_planning::moveit_cpp
   moveit_ros_planning::moveit_planning_scene_monitor

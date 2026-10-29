@@ -15,6 +15,7 @@
   <depend>ompl</depend>
   <depend>eigen</depend>
   <depend>yaml-cpp</depend>
+  <depend>liboctomap-dev</depend>
   <depend>nlohmann-json-dev</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_action</depend>
@@ -28,6 +29,7 @@
   <depend>moveit_planners_ompl</depend>
   <depend>moveit_msgs</depend>
   <depend>shape_msgs</depend>
+  <depend>octomap_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>pcp_benchmark</depend>
 
