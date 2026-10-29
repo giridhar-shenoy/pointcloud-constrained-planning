@@ -424,7 +424,11 @@ int main(int argc, char ** argv)
     // Optional probe (before the benchmark, results only in the .meta.json): MoveIt's planner
     // core with a counting validity checker vs the direct planner on the same queries.
     nlohmann::json probe = nlohmann::json::array();
-    for (int64_t i = 0; i < p.probe_queries && i < static_cast<int64_t>(query_set.queries.size());
+    // Probe queries start at bench.first_query; scripts/check_probe.sh runs one per process,
+    // because reusing MoveIt's cached planning context after swapping its checker crashed.
+    for (int64_t i = std::max<int64_t>(0, p.first_query);
+         i < std::max<int64_t>(0, p.first_query) + p.probe_queries &&
+         i < static_cast<int64_t>(query_set.queries.size());
          ++i) {
       const auto & qq = query_set.queries[static_cast<std::size_t>(i)];
       moveit::core::RobotState ps(model);
