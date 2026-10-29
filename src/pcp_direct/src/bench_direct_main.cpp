@@ -38,9 +38,11 @@
 #include <nlohmann/json.hpp>
 #include <rclcpp/rclcpp.hpp>
 
+#include "pcp_benchmark/constraints.hpp"
 #include "pcp_benchmark/metrics.hpp"
 #include "pcp_benchmark/query_generator.hpp"
 #include "pcp_direct/collision.hpp"
+#include "pcp_direct/constraint.hpp"
 #include "pcp_direct/exec.hpp"
 #include "pcp_direct/moveit_reference.hpp"
 #include "pcp_direct/planner.hpp"
@@ -73,7 +75,9 @@ struct Params
   int64_t first_query = 0;
   int64_t max_queries = -1;
   int64_t ompl_seed = 1;
-  int64_t probe_queries = 0;  ///< queries for the MoveIt validity-check probe (0 = off)
+  int64_t probe_queries = 0;        ///< queries for the MoveIt validity-check probe (0 = off)
+  std::string constraint = "none";  ///< none | orientation (keep-upright, v0.1's definition)
+  double max_tilt_deg = 5.0;
 };
 
 Params loadParams(const rclcpp::Node::SharedPtr & node)
@@ -104,6 +108,8 @@ Params loadParams(const rclcpp::Node::SharedPtr & node)
   get("max_queries", p.max_queries);
   get("ompl_seed", p.ompl_seed);
   get("probe_queries", p.probe_queries);
+  get("constraint", p.constraint);
+  get("max_tilt_deg", p.max_tilt_deg);
   for (const auto * v :
        {&p.queries_file, &p.shelf_yaml, &p.ompl_yaml, &p.joint_limits_yaml, &p.output_csv}) {
     if (v->empty()) {
@@ -298,7 +304,7 @@ struct Row
   // extras (appended after the columns the brief lists)
   std::string status, plan_success, exec_success, traj_duration_s, n_waypoints, own_dense_ok,
     crossval_hits, moveit_error_code, final_err_rad, at_start, order, start_region, goal_region,
-    checks_plan, simplify_budget_s, raw_states, exec_error;
+    checks_plan, simplify_budget_s, raw_states, exec_error, max_tilt_deg;
 };
 
 const char * kHeader =
@@ -307,7 +313,7 @@ const char * kHeader =
   "max_track_err_rad,crossval_ok,commit,seed,"
   "status,plan_success,exec_success,traj_duration_s,n_waypoints,own_dense_ok,crossval_hits,"
   "moveit_error_code,final_err_rad,at_start,order,start_region,goal_region,checks_plan,"
-  "simplify_budget_s,raw_states,exec_error,ompl_seed,executed\n";
+  "simplify_budget_s,raw_states,exec_error,ompl_seed,executed,constraint,max_tilt_deg\n";
 
 std::string csvSafe(std::string s)
 {
@@ -416,6 +422,11 @@ int main(int argc, char ** argv)
       RCLCPP_INFO(kLog, "MoveIt's OMPL context: %s", moveit_ompl.dump().c_str());
     }
     const auto limits = pcp_direct::loadJointLimits(p.joint_limits_yaml, joint_names);
+    const auto constraint_type = pcp_benchmark::constraintTypeFromString(p.constraint);
+    pcp_benchmark::ConstraintSpec spec;
+    spec.link_name = p.tip_link;
+    spec.max_tilt_deg = p.max_tilt_deg;
+    const auto fk = std::make_shared<pcp_direct::FrameKinematics>(urdf, joint_names, p.tip_link);
     RCLCPP_INFO(
       kLog, "direct planner: %s, range %.3f rad, extent %.3f rad, check every %.4f rad",
       settings.planner_config.c_str(), planner.effectiveRange(), planner.maximumExtent(),
@@ -587,6 +598,20 @@ int main(int argc, char ** argv)
         reject += "direct_goal;";
       }
 
+      // Keep-upright (SHOULD): v0.1's definition on both sides. Reference yaw halfway between
+      // the start and goal yaw; per-axis rotation-vector tolerance 5 deg / sqrt(2), yaw free.
+      spec.target_yaw = pcp_benchmark::circularMean(q.start_tcp[3], q.goal_tcp[3]);
+      ompl::base::ConstraintPtr direct_constraint;
+      if (constraint_type == pcp_benchmark::ConstraintType::kOrientation) {
+        const double tol = pcp_benchmark::perAxisToleranceRad(spec.max_tilt_deg);
+        const Eigen::Matrix3d target =
+          (Eigen::AngleAxisd(spec.target_yaw, Eigen::Vector3d::UnitZ()) *
+           Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX()))
+            .toRotationMatrix();
+        direct_constraint = std::make_shared<pcp_direct::KeepUprightConstraint>(
+          fk, target, Eigen::Vector3d(tol, tol, M_PI));
+      }
+
       const bool direct_first = q.id % 2 == 0;  // alternate the order to cancel order effects
       const std::vector<std::string> order = direct_first
                                                ? std::vector<std::string>{"direct", "moveit"}
@@ -619,7 +644,7 @@ int main(int argc, char ** argv)
 
           if (pipeline == "direct") {
             const auto t0 = std::chrono::steady_clock::now();
-            const auto r = planner.plan(q.start, q.goal);
+            const auto r = planner.plan(q.start, q.goal, direct_constraint);
             plan_ok = r.success;
             row.plan_time_s = fx(r.plan_time_s);
             row.checks_plan = std::to_string(r.checks_plan);
@@ -642,6 +667,7 @@ int main(int argc, char ** argv)
           } else {
             planning.setStartState(start_state);
             planning.setGoal(goal_state);
+            planning.setPathConstraints(pcp_benchmark::buildPathConstraints(constraint_type, spec));
             moveit_cpp::PlanningComponent::PlanRequestParameters params;
             params.planner_id = settings.planner_config;
             params.planning_pipeline = p.pipeline;
@@ -675,6 +701,7 @@ int main(int argc, char ** argv)
               pcp_benchmark::computePathMetrics(model, p.group, p.tip_link, path, p.dense_step);
             row.path_len_joint_rad = fx(metrics.joint_path_rad);
             row.path_len_tcp_m = fx(metrics.tcp_path_m);
+            row.max_tilt_deg = fx(metrics.max_tilt_deg, 3);
             row.n_waypoints = std::to_string(path.size());
             // Dense re-check at bench.dense_step by both checkers; crossval = the OTHER one.
             std::size_t direct_hits = 0;
@@ -737,7 +764,8 @@ int main(int argc, char ** argv)
             << row.moveit_error_code << ',' << row.final_err_rad << ',' << row.at_start << ','
             << row.order << ',' << row.start_region << ',' << row.goal_region << ','
             << row.checks_plan << ',' << row.simplify_budget_s << ',' << row.raw_states << ','
-            << row.exec_error << ',' << p.ompl_seed << ',' << (p.execute ? 1 : 0) << '\n';
+            << row.exec_error << ',' << p.ompl_seed << ',' << (p.execute ? 1 : 0) << ','
+            << p.constraint << ',' << row.max_tilt_deg << '\n';
         csv.flush();
         ++rows;
         RCLCPP_INFO(
@@ -776,6 +804,8 @@ int main(int argc, char ** argv)
       {"max_extent_rad", planner.maximumExtent()},
       {"longest_valid_segment_rad", planner.longestValidSegment()},
       {"planning_time_s", p.planning_time},
+      {"constraint", p.constraint},
+      {"max_tilt_deg", p.max_tilt_deg},
       {"sample_dt_s", p.sample_dt},
       {"goal_tolerance_rad", p.goal_tolerance},
       {"dense_step_rad", p.dense_step},

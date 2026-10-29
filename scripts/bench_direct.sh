@@ -28,11 +28,12 @@ mkdir -p "$(dirname "${OUT}")"
 # the file under the running node (it happened once in v0.1; NOTES.md).
 PARTIAL="${REPO}/${OUT}.partial"
 rm -f "${PARTIAL}" "${PARTIAL}.meta.json"
+# PCP_CONSTRAINT=orientation plans both pipelines with v0.1's keep-upright constraint (SHOULD).
 # PCP_PROBE_QUERIES=k first solves k queries in MoveIt's own planning context with a counting
 # validity checker, and with the direct planner (results in the .meta.json only).
 LAUNCH=(ros2 launch pcp_direct bench_direct.launch.py queries_file:="${REPO}/${QUERIES}"
   output_csv:="${PARTIAL}" commit:="${COMMIT}" max_queries:="${N}"
-  probe_queries:="${PCP_PROBE_QUERIES:-0}")
+  probe_queries:="${PCP_PROBE_QUERIES:-0}" constraint:="${PCP_CONSTRAINT:-none}")
 start=$(date +%s)
 if [ "${MODE}" = "--plan-only" ]; then
   set +u
