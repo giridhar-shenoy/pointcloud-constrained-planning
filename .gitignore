@@ -16,3 +16,8 @@ results/tmp/
 *.bag
 *.partial
 *.partial.meta.json
+
+# Working session logs (kept on disk for the build sessions, not tracked)
+CHECKPOINTS.md
+MORNING.md
+NOTES.md
