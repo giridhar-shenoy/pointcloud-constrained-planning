@@ -17,12 +17,11 @@ solved in OMPL's constrained (projected) state space. v0.2 plans the same querie
 pipeline written directly on OMPL, Pinocchio/coal and a trapezoidal parameteriser, executes both
 on the same controller, and measures what MoveIt's machinery costs and whether the two collision
 checkers agree. Every number below comes from a CSV through a script, with Wilson confidence
-intervals and a "where it fails" section that is as long as the results.
+intervals.
 
 **Language split:** C++17 for everything on the planning path (benchmark nodes, constraint builder,
-query generator, metrics, and the whole v0.2 direct pipeline: collision checker, planner,
-parameterisation, executor); Python only for launch files, test orchestration and the aggregation
-and plotting scripts, because nothing in Python is timing-critical.
+query generator, metrics, and the whole direct pipeline); Python for launch files, test
+orchestration, aggregation and plots.
 
 ## Run it
 
@@ -149,7 +148,8 @@ parameterisers), and the per-request check counts (MoveIt does not expose them).
   checking would close this; neither is in v0.1.
 - **Executing plans in Gazebo needs slow playback.** `gz_ros2_control` tracks position commands
   through a soft proportional loop; time-optimal trajectories lag by 0.2 rad at 2–5× slow-down and
-  clip the shelf, so the GIF is played 15× slower. The benchmark only plans; it does not execute.
+  clip the shelf, so the GIF is played 15× slower. The v0.1 benchmark only plans; v0.2 executes
+  both pipelines.
 - **The collision-check resolution default is wrong for this arm.** With MoveIt's usual
   `longest_valid_segment_fraction: 0.005` that same 69 rad extent means a motion check only every
   0.35 rad: in the first full run every unconstrained failure was a path that stepped over a 2 cm
@@ -252,17 +252,7 @@ parameterisers), and the per-request check counts (MoveIt does not expose them).
 - A dual-arm UR5e configuration and a small task-and-motion-planning layer (PDDL blocks world with
   replanning on failure).
 - Depth noise models (or a real camera) and learned samplers for the constrained manifold.
-- MIP-based assembly sequencing, as in the NUS 34489 description; pick_ik / TRAC-IK instead of KDL.
-
-## How this maps to NUS 34489 / CMU NREC / Perceptyne L3
-
-| Job description phrase | Where it is demonstrated |
-|---|---|
-| NUS 34489: "sampling-based planners, collision checking, inverse kinematics, and trajectory optimisation" | `src/pcp_moveit_config/config/ompl_planning.yaml`, `src/pcp_benchmark/src/query_generator.cpp` (damped-least-squares IK), `scripts/ci_smoke.sh` (octomap collision check); v0.2: `src/pcp_direct/src/planner.cpp` (OMPL used directly), `src/pcp_direct/src/collision.cpp` + `results/collision_agreement.csv` (Pinocchio/coal vs FCL); trajectory optimisation (CHOMP/STOMP) is "next" |
-| CMU NREC: "motion planning or grasp/manipulation planning" | `src/pcp_benchmark/src/benchmark_main.cpp`, `results/bench.csv`, `docs/results.md`; v0.2: `src/pcp_direct/src/bench_direct_main.cpp`, `results/bench_direct.csv` (two pipelines, executed in Gazebo) |
-| CMU NREC: "3D perception on point clouds" | `src/pcp_description/urdf/rgbd_camera.xacro`, `src/pcp_moveit_config/config/sensors_3d.yaml`, `docs/architecture.md` |
-| CMU NREC: "ROS2 and MoveIt" | `src/pcp_bringup/launch/sim.launch.py`, `src/pcp_benchmark` (MoveItCpp + PlanningComponent) |
-| Perceptyne L3: TODO(Giri): paste the exact JD phrase | candidate: constrained manipulation planning, `docs/planners.md` |
+- MIP-based assembly sequencing; pick_ik or TRAC-IK instead of KDL.
 
 ## Repository layout
 
@@ -281,3 +271,6 @@ results/              queries.json, bench.csv (+ .meta.json), summary.json; v0.2
 ```
 
 MIT licensed. Third-party files are listed in [THIRD_PARTY.md](THIRD_PARTY.md).
+
+Written with an AI coding agent working in my terminal; I set the scope, the constraints and the
+acceptance criteria, reviewed the changes, and ran every benchmark.
