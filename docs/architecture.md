@@ -1,11 +1,20 @@
 # Architecture
 
-Language split: **C++17** for everything on the planning path (the benchmark node, constraint
-builder, query generator, metrics; MoveIt and OMPL themselves); **Python** only for launch files,
-the smoke-test orchestrator, the shelf-world generator and `scripts/aggregate.py` (tables and
-plots). The planner never runs through Python.
+Two planning pipelines share one simulation. **v0.1** plans with MoveIt 2 (MoveItCpp, OMPL's
+RRTConnect) on the octomap `move_group` builds live from the simulated depth camera, with and
+without the keep-upright constraint ([first diagram](#v01-nodes-topics-and-data-flow)). **v0.2**
+adds `pcp_direct`, the same planning written directly on OMPL, Pinocchio/coal and a trapezoidal
+time parameterisation, run beside MoveIt in one process on the same queries, box scene, settings
+and controller ([second diagram](#v02-the-direct-pipeline-beside-moveit-2)). Settings and
+equations for both are in [planners.md](planners.md).
 
-## Nodes, topics and data flow
+Language split: **C++17** for everything on the planning path (the v0.1 benchmark node,
+constraint builder, query generator, metrics; the whole v0.2 direct pipeline and its benchmark
+node; MoveIt and OMPL themselves); **Python** only for launch files, the smoke-test orchestrator,
+the shelf-world generator, the GIF recorder and `scripts/aggregate.py` / `scripts/aggregate_direct.py`
+(tables and plots). No planner runs through Python.
+
+## v0.1: nodes, topics and data flow
 
 ```mermaid
 flowchart LR
@@ -84,14 +93,17 @@ flowchart LR
 
 `world` is the root of the URDF (UR base at the origin). `camera_link` is fixed to `world` at
 (−0.5, −0.6, 1.3) m looking at the shelf; the Gazebo point cloud arrives in `camera_link`
-(x forward), which was checked by transforming a live cloud into `world` (45 % of points within
-1.5 cm of a shelf box, 44 % on the floor, the rest on the arm). The octomap frame is `world`.
+(x forward), which was checked by transforming a live cloud into `world`: the points landed on
+the shelf boxes, the floor and the arm. The octomap frame is `world`.
 
 ## v0.2: the direct pipeline beside MoveIt 2
 
-Language split is unchanged: the direct pipeline (`src/pcp_direct`: collision checker, planner,
-parameterisation, executor, benchmark node, box loader, agreement test) is C++17; only
-`scripts/aggregate_direct.py` (tables and the figure) is Python.
+The direct pipeline (`src/pcp_direct`: collision checker, planner, parameterisation, executor,
+benchmark node `bench_direct`, box loader, agreement test) is C++17, and its libraries use no
+MoveIt code; only `scripts/aggregate_direct.py` (tables and figures) is Python. The diagram shows
+both pipelines inside `bench_direct` as two lanes, the direct one (boxes → coal checker → OMPL →
+trapezoids) and MoveIt's (boxes → planning scene → `plan()` → TOTG), ending at the same
+controller.
 
 ```mermaid
 flowchart LR
@@ -104,7 +116,7 @@ flowchart LR
   subgraph DIRECT["direct lane (pcp_direct libraries, no MoveIt)"]
     coll["CollisionChecker<br/>Pinocchio model + GeometryModel,<br/>coal meshes + coal boxes,<br/>addAllCollisionPairs - SRDF pairs"]
     plan["DirectPlanner<br/>SimpleSetup + RRTConnect on JointSpaceL1<br/>(MoveIt's L1 metric and extent),<br/>simplifySolution(10 s - plan time)"]
-    traj["parameterise()<br/>R1 trapezoids, rest-to-rest,<br/>-> trajectory_msgs/JointTrajectory"]
+    traj["parameterise()<br/>trapezoids, rest-to-rest<br/>(from ur5e-teaching-controllers),<br/>-> trajectory_msgs/JointTrajectory"]
     exe["TrajectoryExecutor<br/>FollowJointTrajectory client"]
   end
 
@@ -151,14 +163,23 @@ flowchart LR
 
 - **One process, one scene.** `bench_direct` hosts both lanes. MoveIt plans on a clone of its
   planning scene taken once all seven boxes have arrived from `shelf_boxes_loader`; the direct
-  checker is built from the same URDF/SRDF strings and the same YAML. A scene with an octomap is
-  refused.
+  checker is built from the same URDF/SRDF strings and the same YAML. The node refuses a frozen
+  scene whose octomap does not match the requested mode: none for the box scene, and with
+  `--octomap` the map `move_group` built from the camera, which the direct checker then reads as
+  one `coal::OcTree` (the diagram shows the box scene).
 - **Settings are read, then verified.** The direct planner reads MoveIt's `ompl_planning.yaml`;
   the node aborts if MoveIt's loaded parameters differ, and records the OMPL context MoveIt
   actually configures (extent, check spacing, range) in the `.meta.json`.
 - **Same controller, same measurement.** Both lanes end at the sim's
   `joint_trajectory_controller`; tracking error for both is `/joint_states` against the
   controller's own reference (`controller_state`), matched by stamp. Before every run the direct
-  planner moves the arm to that run's start; the order of the two lanes alternates per query.
+  planner moves the arm to that run's start; if an aborted execution left the arm in collision,
+  the harness first escapes with an unchecked straight joint-space move (simulation only). The
+  order of the two lanes alternates per query.
 - **Agreement test** (`collision_agreement`, no Gazebo): the same MoveItCpp scene and direct checker,
-  500 seeded uniform configurations plus a boundary probe.
+  500 seeded uniform configurations plus a boundary probe (method in
+  [planners.md](planners.md#collision-agreement-test)).
+- **Keep-upright and probe modes.** `PCP_CONSTRAINT=orientation` gives both lanes v0.1's
+  keep-upright constraint (the direct lane on OMPL's `ProjectedStateSpace`); `check_probe.sh`
+  counts and times MoveIt's validity checks inside its own planning context. Details in
+  [planners.md](planners.md#v02-the-direct-pipeline).

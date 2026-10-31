@@ -27,7 +27,7 @@ if ! "${GIT[@]}" diff --quiet HEAD -- src "${QUERIES}"; then
 fi
 mkdir -p "$(dirname "${OUT}")"
 # Write <OUT>.partial and rename at the end, so a git operation on the tracked CSV can never swap
-# the file under the running node (it happened once in v0.1; NOTES.md).
+# the file under the running node (it happened once while v0.1 was being benchmarked).
 PARTIAL="${REPO}/${OUT}.partial"
 rm -f "${PARTIAL}" "${PARTIAL}.meta.json"
 # PCP_CONSTRAINT=orientation plans both pipelines with v0.1's keep-upright constraint (SHOULD).
