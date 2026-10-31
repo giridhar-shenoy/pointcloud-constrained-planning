@@ -2082,9 +2082,14 @@ def failure_numbers_block(pub: Run, re: Run | None) -> str:
             + "; ".join(parts)
             + f". Repositioning moves (one before each execution, both pipelines): "
             f"{meta.get('repositions_attempted', 0)} attempted, "
-            f"{meta.get('reposition_failures', 0)} still off their start after a "
-            f"retry (aborted attempts are retried, not counted); the harness freed the arm from "
-            f"contact {meta.get('escapes', 0)} times."
+            + (
+                "every one ended at its start (an attempt that aborted was retried and is not "
+                "counted as a failure)"
+                if not meta.get("reposition_failures", 0)
+                else f"{meta.get('reposition_failures', 0)} still off their start after a retry "
+                "(an attempt that aborted was retried and is not counted as a failure)"
+            )
+            + f"; the harness freed the arm from contact {meta.get('escapes', 0)} times."
         )
         runs1 = REPO / "results/runs/bench_direct_run1_no_recovery.csv"
         cascade = first_run_cascade(load(runs1)) if runs1.exists() else None

@@ -53,6 +53,8 @@ starting the simulation, tests and plots.
 isolated, packaged copy of the software environment) built from the included Dockerfile:
 
 ```bash
+git clone https://github.com/giridhar-shenoy/pointcloud-constrained-planning.git
+cd pointcloud-constrained-planning   # every command below runs from this folder
 # optional, on any Linux with Docker: open a shell in the container, then run the lines below
 docker build -t pcp . && docker run --rm -it -v "$PWD":/ws pcp
 rosdep update && rosdep install --from-paths src --ignore-src -y  # system packages the code needs
@@ -488,7 +490,7 @@ link of the arm.
 | F18 | Simplification took longer than the OMPL search on 93/100 direct plans. |
 | F19 | 500/500 random configurations get the same verdict. Where consecutive samples switch between collide and no-collide, the step between them was halved until both ends were within nanometres of contact: 180/194 of those cases agree; in the other 14 coal reports contact where FCL measures 1–5 nm of separation, all on forearm_link/wrist_3_link. |
 | F20 | Paths that fail the other pipeline's dense check at 0.01 rad: MoveIt 9/100, direct 3/100; on every path the other checker agrees with the path's own checker. |
-| F21 | Executions that did not reach the goal: direct 0; MoveIt 1, a path-tolerance abort (tracking error at the 0.2 rad path tolerance) on a path clean on both dense checks. Repositioning moves (one before each execution, both pipelines): 200 attempted, 0 still off their start after a retry (aborted attempts are retried, not counted); the harness freed the arm from contact 2 times. In an earlier full run of the same benchmark (commit `b3a170c`, before the harness could free the arm; kept in `results/runs/`, not one of the published runs), all 85 runs after the first failed execution failed. |
+| F21 | Executions that did not reach the goal: direct 0; MoveIt 1, a path-tolerance abort (tracking error at the 0.2 rad path tolerance) on a path clean on both dense checks. Repositioning moves (one before each execution, both pipelines): 200 attempted, every one ended at its start (an attempt that aborted was retried and is not counted as a failure); the harness freed the arm from contact 2 times. In an earlier full run of the same benchmark (commit `b3a170c`, before the harness could free the arm; kept in `results/runs/`, not one of the published runs), all 85 runs after the first failed execution failed. |
 | F22 | Max joint tracking error, median / 95th percentile over all executions: direct 0.0330 / 0.0538 rad, MoveIt 0.0457 / 0.0578 rad; worst MoveIt execution that reached the goal 0.0605 rad. |
 | F26 | 95th percentile (p95) of the max tracking error: direct 0.0538 rad, MoveIt 0.0578 rad, i.e. 5.4× and 5.8× the 0.01 rad dense-check step; executions above that step: direct 100/100, MoveIt 100/100. As an upper bound at the tool, if all of that lag were at the shoulder with the tool as far from it as the UR5e's links allow (1.04 m, the sum of the arm's link lengths in the UR5e's standard model), the p95 lag would move the tool 5.6 cm (direct) and 6.0 cm (MoveIt), more than the queries' 3 cm clearance from the shelf (`results/queries_boxes.json`); a bound, not a measured distance. |
 | F27 | Keep-upright planned, direct vs MoveIt, by query class (how start and goal compartments relate): same compartment 18/18 vs 18/18; across board 22/29 vs 25/29; across divider 8/22 vs 18/22; diagonal 10/31 vs 27/31. The direct planner fails 31 queries MoveIt solves and solves 1 MoveIt fails; its deficit is largest across the divider and diagonal. |
