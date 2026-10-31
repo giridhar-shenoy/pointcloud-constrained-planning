@@ -1,0 +1,27 @@
+{
+  "cells": 40,
+  "commit": "e79d066",
+  "constraints": [
+    "none",
+    "orientation"
+  ],
+  "enforce_constrained_state_space": true,
+  "finished_utc": "2026-10-31T02:34:03Z",
+  "first_query": 0,
+  "hardware_threads": 8,
+  "octomap_resolution_m": 0.02,
+  "octomap_voxels": 4747,
+  "octomap_wait_s": 10.50533408,
+  "ompl_seed": 1,
+  "orientation_per_axis_tolerance_rad": 0.061706707474421744,
+  "planners": [
+    "RRTConnectRange2"
+  ],
+  "planning_time_s": 10.0,
+  "queries_file": "/tmp/verify/r2/results/queries.json",
+  "queries_run": 20,
+  "query_seed": 0,
+  "repetitions": 1,
+  "successes": 37,
+  "total_wall_time_s": 92.071821418
+}
