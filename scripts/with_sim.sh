@@ -23,7 +23,7 @@ source /opt/ros/lyrical/setup.bash
 source "${REPO}/install/setup.bash"
 set -u
 
-# One Gazebo at a time on this machine (MACHINE.md): wait for any other gz sim to exit first.
+# One Gazebo at a time on the shared development machine: wait for any other gz sim to exit first.
 # "[b]in/gz sim" matches the real server ("ruby .../bin/gz sim ...") but not shells whose command
 # text merely mentions gz sim (a plain "gz sim" pattern matched this script's own parent shell).
 waited=0

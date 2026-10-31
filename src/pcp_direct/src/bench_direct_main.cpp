@@ -3,7 +3,7 @@
 // bench_direct: the same queries, the same box shelf, the same planner settings and (optionally)
 // the same controller, planned by two pipelines:
 //   direct — pcp_direct: OMPL RRTConnect on the Pinocchio/coal checker, OMPL's simplifier,
-//            R1's trapezoidal parameterisation, a FollowJointTrajectory client;
+//            trapezoids from ur5e-teaching-controllers, a FollowJointTrajectory client;
 //   moveit — MoveItCpp PlanningComponent::plan() on a frozen planning scene (OMPL pipeline with
 //            its request/response adapters, TOTG), MoveItCpp::execute() (trajectory execution
 //            manager).
@@ -365,7 +365,7 @@ int main(int argc, char ** argv)
   try {
     const Params p = loadParams(node);
     // Seeds OMPL's RNG for the direct planner. MoveIt's state sampler uses its own
-    // random_numbers generator, so MoveIt plans are not seed-reproducible (NOTES.md).
+    // random_numbers generator, so MoveIt plans are not seed-reproducible (docs/planners.md, F24).
     ompl::RNG::setSeed(static_cast<std::uint_fast32_t>(p.ompl_seed));
 
     const auto query_set = pcp_benchmark::queriesFromJson(
@@ -570,9 +570,9 @@ int main(int argc, char ** argv)
 
     // Recovery (harness, not part of either pipeline): an aborted execution can leave the arm
     // stopped against the shelf, in a configuration the planner rejects as a start. The first
-    // full run cascaded from one such abort (NOTES.md). Escape: sample boxes of growing size
-    // around the measured configuration, take the closest collision-free sample with >= 5 mm
-    // clearance, move there in a straight joint-space line, then plan as usual.
+    // full run cascaded from one such abort (docs/planners.md, F21). Escape: sample boxes of
+    // growing size around the measured configuration, take the closest collision-free sample
+    // with >= 5 mm clearance, move there in a straight joint-space line, then plan as usual.
     pcp_benchmark::DeterministicRng escape_rng(static_cast<std::uint64_t>(p.ompl_seed));
     std::size_t escapes = 0;
     std::size_t escape_failures = 0;

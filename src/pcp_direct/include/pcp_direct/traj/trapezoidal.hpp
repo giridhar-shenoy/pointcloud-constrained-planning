@@ -3,7 +3,8 @@
 // ORIGIN: copied from my own repository ur5e-teaching-controllers (MIT),
 // https://github.com/giridhar-shenoy/ur5e-teaching-controllers, file
 // src/ur5e_teaching_controllers/src/profiles/trapezoidal.hpp at commit 52fc1ba.
-// Only change: the namespace (ur5e_teaching_controllers::profiles -> pcp_direct::profiles).
+// Changes: the namespace (ur5e_teaching_controllers::profiles -> pcp_direct::profiles), this
+// origin comment, and the docs/controllers.md pointer below now names that repository.
 // The v0.2 brief asks for this generator, unmodified, instead of a new library.
 //
 // Header-only, synchronised, velocity- and acceleration-limited trapezoidal profiles.
@@ -17,7 +18,8 @@
 //
 // All joints of a segment share T = max(T_requested, max_j T_j), so they start and stop
 // together and every joint stays inside its own limits. Waypoints are reached at rest (no
-// via-point blending); that is a deliberate v0.1 simplification, see docs/controllers.md.
+// via-point blending); that is a deliberate simplification of ur5e-teaching-controllers v0.1,
+// see docs/controllers.md in that repository.
 #pragma once
 
 #include <algorithm>
