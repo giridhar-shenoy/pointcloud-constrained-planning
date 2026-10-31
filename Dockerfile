@@ -1,5 +1,5 @@
 # Reproducible environment for reviewers on any distro (Jazzy, Humble, macOS, ...).
-# Base tag verified on Docker Hub via the registry v2 API on 2026-10-28 (see NOTES.md / SHARED.md).
+# Base tag verified on Docker Hub via the registry v2 API on 2026-10-28.
 FROM ros:lyrical-ros-base
 
 ARG DEBIAN_FRONTEND=noninteractive

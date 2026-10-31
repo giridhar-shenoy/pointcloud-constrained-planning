@@ -2,9 +2,11 @@
 # Regenerate every number and GIF in the README from scratch:
 #   1. build the workspace and run the unit tests (incl. the queries.json determinism test),
 #   2. regenerate results/queries.json from seed 0 and fail if it differs from the committed file,
-#   3. run the smoke test, the 100-query planner benchmark, the aggregation and the GIF.
+#   3. run the smoke test, the benchmarks and both aggregations,
+#   4. record the three README GIFs last (scripts/record_gifs.sh), from the CSVs just written, so
+#      a GIF failure can no longer stop the v0.2 steps (it did on 31 Oct 2026).
 # Gazebo steps take the shared-machine lock when ~/work/.locks exists (no-op elsewhere).
-# Measured runtime on the i5-1135G7 laptop is recorded in NOTES.md.
+# The total runtime is printed at the end ("done in N s").
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO}"
@@ -64,7 +66,6 @@ lock gazebo scripts/bench_octomap_resolution.sh 20 0.02 0.05
 # The 0.005-resolution ablation is regenerated at its own commit:
 #   git checkout 6c12eeb && scripts/bench_planners.sh 100 results/ablation/bench_lvsf0.005.csv
 python3 scripts/aggregate.py
-lock gazebo scripts/record_gifs.sh results/bench.csv
 # v0.2: collision agreement, direct vs MoveIt with execution, the check-count probe, tables.
 # Timings are published, so these take the heavy, build and gazebo locks together.
 lock3 scripts/collision_agreement.sh 500
@@ -74,4 +75,6 @@ lock3 env PCP_CONSTRAINT=orientation scripts/bench_direct.sh 100 results/bench_d
   --plan-only
 lock3 scripts/bench_direct.sh 100 results/bench_direct_octomap.csv --octomap
 python3 scripts/aggregate_direct.py
+# GIFs: Gazebo plus RViz rendering, so the heavy lock too; the query rule reads both CSVs.
+lock3 scripts/record_gifs.sh results/bench.csv results/bench_direct.csv
 echo "[regenerate_all] done in $(( $(date +%s) - start )) s"

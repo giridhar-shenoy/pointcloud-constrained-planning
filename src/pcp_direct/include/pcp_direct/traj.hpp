@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Giridhar J Shenoy. MIT License.
 //
 // Time parameterisation of a joint path with the joint-synchronised, rest-to-rest trapezoidal
-// profiles of traj/trapezoidal.hpp (copied from R1), sampled into a JointTrajectory message.
+// profiles of traj/trapezoidal.hpp (copied from ur5e-teaching-controllers, see THIRD_PARTY.md),
+// sampled into a JointTrajectory message.
 #pragma once
 
 #include <string>

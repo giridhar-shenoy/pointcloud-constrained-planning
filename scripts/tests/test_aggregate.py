@@ -60,3 +60,51 @@ def test_summary_uses_successes_only_for_time_and_length():
     assert math.isclose(s["time_median_s"], 0.2)
     assert s["joint_path_median_rad"] == 2.0
     assert s["planner"] == "RRTConnect (auto range, 13.8 rad)"
+
+
+def _slug(heading: str) -> str:
+    """GitHub's heading anchor: lower case, punctuation dropped, spaces to hyphens."""
+    out = []
+    for ch in heading.strip().lower():
+        if ch.isalnum() or ch in "-_":
+            out.append(ch)
+        elif ch == " ":
+            out.append("-")
+    return "".join(out)
+
+
+def test_wall_time_is_labelled_per_file_and_summed():
+    paths = [pathlib.Path("bench.csv"), pathlib.Path("bench_bitrrt.csv")]
+    txt = agg.wall_time_text(paths, [{"total_wall_time_s": 60.0}, {"total_wall_time_s": 120.0}])
+    assert txt == "wall time 1.0 min (`bench.csv`) + 2.0 min (`bench_bitrrt.csv`) = 3.0 min"
+    assert agg.wall_time_text(paths[:1], [{"total_wall_time_s": 90.0}]) == (
+        "wall time 1.5 min (`bench.csv`)"
+    )
+
+
+def test_contents_anchors_exist_in_results_md():
+    text = (HERE.parent.parent / "docs" / "results.md").read_text()
+    anchors = {_slug(line.lstrip("#")) for line in text.splitlines() if line.startswith("#")}
+    missing = [a for _, a in agg.CONTENTS if a not in anchors]
+    assert not missing, missing
+
+
+def test_check_mode_detects_a_stale_results_md(tmp_path, capsys):
+    real = (HERE.parent.parent / "docs" / "results.md").read_text()
+    copy = tmp_path / "results.md"
+    copy.write_text(real)
+    assert agg.main(["--check", "--results-md", str(copy)]) == 0
+    # Change one v0.1 number outside the direct block: --check must report it.
+    v01, sep, rest = real.partition(agg.DIRECT_START)
+    copy.write_text(v01.replace("100/100 = 100 %", "99/100 = 99 %", 1) + sep + rest)
+    assert agg.main(["--check", "--results-md", str(copy)]) == 1
+    assert "stale" in capsys.readouterr().err
+
+
+def test_duplicated_direct_marker_fails_clearly(tmp_path):
+    import pytest
+
+    copy = tmp_path / "results.md"
+    copy.write_text(f"{agg.DIRECT_START}\na\n{agg.DIRECT_END}\n{agg.DIRECT_START}\n")
+    with pytest.raises(SystemExit, match="at most once"):
+        agg.main(["--check", "--results-md", str(copy)])

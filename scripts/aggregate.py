@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
-"""Aggregate results/bench.csv into tables (docs/results.md, README section) and plots.
+"""Aggregate the v0.1 results (results/bench.csv + results/bench_bitrrt.csv) into docs/results.md,
+results/summary.json and the v0.1 plots.
 
-    scripts/aggregate.py [--csv results/bench.csv] [--no-plots]
+    scripts/aggregate.py [--csv results/bench.csv] [--no-plots] [--print-only] [--check]
+                         [--results-md docs/results.md]
 
-Everything in docs/results.md and between the README's `results:start/end` markers is written
-by this script from the CSV; nothing is typed by hand.
+docs/results.md is written by this script except the block between `<!-- direct:start -->` and
+`<!-- direct:end -->`, which scripts/aggregate_direct.py owns and this script keeps. The README
+blocks are all written by scripts/aggregate_direct.py (they combine v0.1 and v0.2 numbers and
+compute the v0.1 ones with this module's functions from the same CSVs), so the two scripts can
+run in either order. `--check` writes nothing and makes no plots; it exits 1 if docs/results.md
+(outside the direct block) or results/summary.json differs from what the CSVs give. Nothing is
+typed by hand.
 """
 
 from __future__ import annotations
@@ -15,6 +22,7 @@ import json
 import math
 import pathlib
 import statistics
+import sys
 from collections import defaultdict
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -335,7 +343,7 @@ EXTRA_SECTIONS = [
     (
         "results/sweep/octomap_0.02.csv",
         "Octomap resolution sweep: 2 cm (first 20 evaluation queries)",
-        "SHOULD item. The first 20 seed-0 queries with the benchmark planner, octomap voxels of "
+        "The first 20 seed-0 queries with the benchmark planner, octomap voxels of "
         "2 cm (the default) in a fresh simulation; compare with the 5 cm section below.",
         "`scripts/bench_octomap_resolution.sh 20 0.02 0.05`",
     ),
@@ -390,12 +398,51 @@ def extra_sections() -> tuple[str, list[str]]:
     return "\n".join(md), regen
 
 
-def replace_between(text: str, start: str, end: str, body: str) -> str:
-    i, j = text.index(start) + len(start), text.index(end)
-    return text[:i] + "\n" + body + "\n" + text[j:]
+PLOT_FILES = ("bench_planning_time_ecdf.png", "bench_max_tilt.png")
+
+# Static table of contents; scripts/tests checks that every anchor exists in docs/results.md.
+CONTENTS = [
+    ("v0.1: planner × constraint", "v01-planner--constraint"),
+    ("v0.1: by query class", "v01-by-query-class"),
+    (
+        "How RRTConnect's range was chosen",
+        "how-rrtconnects-range-was-chosen-tuning-set-not-the-evaluation-set",
+    ),
+    ("Octomap resolution sweep", "octomap-resolution-sweep-2-cm-first-20-evaluation-queries"),
+    (
+        "v0.2: direct pipeline vs MoveIt 2",
+        "v02-direct-ompl--coal-pipeline-vs-moveit-2-same-queries-boxes-settings-controller",
+    ),
+    ("Where the planning time goes (probe)", "where-the-planning-time-goes-probe"),
+    ("Keep-upright in both pipelines", "keep-upright-in-both-pipelines"),
+    ("Both pipelines on move_group's octomap", "both-pipelines-on-move_groups-octomap"),
+    (
+        "Execution in Gazebo: aborts, repositioning, tracking error",
+        "execution-in-gazebo-aborts-repositioning-tracking-error",
+    ),
+    (
+        "Collision agreement",
+        "collision-agreement-moveits-planning-scene-vs-the-direct-checker",
+    ),
+    ("Run-to-run: 30 Oct vs 31 Oct", "run-to-run-30-oct-vs-31-oct"),
+]
 
 
-def main() -> int:
+def wall_time_text(csv_paths: list[pathlib.Path], metas: list[dict]) -> str:
+    """Each CSV's own wall time, labelled, and their sum (one meta file per CSV)."""
+    parts = [
+        (p.name, m["total_wall_time_s"])
+        for p, m in zip(csv_paths, metas, strict=True)
+        if m.get("total_wall_time_s") is not None
+    ]
+    if not parts:
+        return ""
+    each = " + ".join(f"{t / 60:.1f} min (`{name}`)" for name, t in parts)
+    total = sum(t for _, t in parts)
+    return f"wall time {each}" + (f" = {total / 60:.1f} min" if len(parts) > 1 else "")
+
+
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument(
         "--csv",
@@ -407,7 +454,15 @@ def main() -> int:
     ap.add_argument(
         "--print-only", action="store_true", help="print the table, write nothing (CI mini-bench)"
     )
-    args = ap.parse_args()
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="write nothing, make no plots; exit 1 if docs/results.md (outside the direct block) "
+        "or results/summary.json is stale",
+    )
+    ap.add_argument("--results-md", default="docs/results.md")
+    ap.add_argument("--summary", default="results/summary.json")
+    args = ap.parse_args(argv)
     csv_paths = (
         [pathlib.Path(c) for c in args.csv]
         if args.csv
@@ -417,38 +472,31 @@ def main() -> int:
             if p.exists()
         ]
     )
-    csv_path = csv_paths[0]
     rows = [r for p in csv_paths for r in load_rows(p)]
     if not rows:
         raise SystemExit(f"{csv_paths} have no rows")
-    meta_path = pathlib.Path(str(csv_path) + ".meta.json")
-    meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+    metas = [
+        json.loads(m.read_text()) if (m := pathlib.Path(str(p) + ".meta.json")).exists() else {}
+        for p in csv_paths
+    ]
     summary = summarise(rows)
     classes = by_query_class(rows)
-    rel = (
-        csv_path.resolve().relative_to(REPO)
-        if csv_path.resolve().is_relative_to(REPO)
-        else csv_path
-    )
 
+    def relpath(p: pathlib.Path) -> str:
+        return str(p.resolve().relative_to(REPO) if p.resolve().is_relative_to(REPO) else p)
+
+    rel = " + ".join(relpath(p) for p in csv_paths)
     commits = sorted({r["commit"] for r in rows})
     queries = sorted({int(r["query_id"]) for r in rows})
     modes = ", ".join(f"`{m}`" for m in sorted({r["mode"] for r in rows}))
-    if len(csv_paths) > 1:
-        rel = " + ".join(
-            f"{p.resolve().relative_to(REPO) if p.resolve().is_relative_to(REPO) else p}"
-            for p in csv_paths
-        )
+    voxels = sorted({m["octomap_voxels"] for m in metas if "octomap_voxels" in m})
+    wall = wall_time_text(csv_paths, metas)
     header = (
         f"Source: `{rel}` ({len(rows)} rows, {len(queries)} queries, commit "
         f"{', '.join(f'`{c}`' for c in commits)}, query seed {rows[0]['query_seed']}, OMPL seed "
         f"{rows[0]['ompl_seed']}, modes {modes}, 10 s per cell"
-        + (
-            f", octomap {meta['octomap_voxels']} occupied 2 cm voxels, "
-            f"total wall time {meta['total_wall_time_s'] / 60:.1f} min"
-            if meta
-            else ""
-        )
+        + (f", octomap {' / '.join(str(v) for v in voxels)} occupied 2 cm voxels" if voxels else "")
+        + (f", {wall}" if wall else "")
         + ")."
     )
     table = main_table(summary)
@@ -456,23 +504,23 @@ def main() -> int:
         print(header)
         print(table)
         return 0
-    (REPO / "results" / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
-
-    plots = [] if args.no_plots else make_plots(rows, REPO / "docs" / "assets")
 
     extra_md, extra_regen = extra_sections()
+    contents = "\n".join(f"- [{t}](#{a})" for t, a in CONTENTS)
     results_md = (
         f"""# Results
 
-<!-- GENERATED by scripts/aggregate.py from {rel}; do not edit by hand. -->
+<!-- GENERATED by scripts/aggregate.py and scripts/aggregate_direct.py; do not edit by hand. -->
 
-Every number here comes from `{rel}` through `scripts/aggregate.py`. Regenerate the CSV with
-`flock ~/work/.locks/gazebo.lock scripts/bench_planners.sh` (or the whole set with
-`scripts/regenerate_all.sh`), then run `scripts/aggregate.py`.
+Every number here comes from the CSVs under `results/` through `scripts/aggregate.py` (v0.1) and
+`scripts/aggregate_direct.py` (v0.2 and the run-to-run comparison). Regenerate the CSVs with
+`scripts/regenerate_all.sh`, then run both scripts; `--check` on either reports a stale file.
+
+{contents}
 
 {header}
 
-## Planner × constraint (feature prompt step 6)
+## v0.1: planner × constraint
 
 {table}
 
@@ -491,7 +539,7 @@ Every number here comes from `{rel}` through `scripts/aggregate.py`. Regenerate 
         + ", ".join(f"{s['constraint']} {s['invalid_queries']}" for s in summary)
         + f""".
 
-## By query class
+## v0.1: by query class
 
 How the start and goal compartments relate (same compartment, across the central divider,
 across the middle board, or diagonal).
@@ -511,31 +559,50 @@ across the middle board, or diagonal).
         )
         + "\n"
         + "".join(line + "\n" for line in extra_regen)
+        + "\n## Plots\n\n"
+        + "\n".join(f"![{pathlib.Path(n).stem}](assets/{n})" for n in PLOT_FILES)
+        + "\n"
     )
-    if plots:
-        results_md += (
-            "\n## Plots\n\n" + "\n".join(f"![{p.stem}](assets/{p.name})" for p in plots) + "\n"
-        )
-    results_path = REPO / "docs" / "results.md"
+    results_path = REPO / args.results_md
     # v0.2: scripts/aggregate_direct.py owns the block between these markers (direct pipeline vs
-    # MoveIt, collision agreement); regenerating the v0.1 tables must keep it.
+    # MoveIt, collision agreement, run-to-run); regenerating the v0.1 tables must keep it.
     old = results_path.read_text() if results_path.exists() else ""
-    if DIRECT_START in old and DIRECT_END in old:
+    if old.count(DIRECT_START) > 1 or old.count(DIRECT_END) > 1:
+        raise SystemExit(
+            f"{args.results_md}: {DIRECT_START} / {DIRECT_END} must appear at most once "
+            f"(found {old.count(DIRECT_START)} / {old.count(DIRECT_END)})"
+        )
+    if (DIRECT_START in old) != (DIRECT_END in old):
+        raise SystemExit(f"{args.results_md}: only one of {DIRECT_START} / {DIRECT_END} present")
+    if DIRECT_START in old:
         block = old[old.index(DIRECT_START) : old.index(DIRECT_END) + len(DIRECT_END)]
         results_md += "\n" + block + "\n"
-    results_path.write_text(results_md)
+    summary_json = json.dumps(summary, indent=2) + "\n"
+    summary_path = REPO / args.summary
 
-    readme = REPO / "README.md"
-    text = readme.read_text()
-    if "<!-- results:start -->" in text:
-        readme.write_text(
-            replace_between(
-                text,
-                "<!-- results:start -->",
-                "<!-- results:end -->",
-                f"<!-- generated by scripts/aggregate.py -->\n\n{table}\n\n{header}\n",
+    if args.check:
+        stale = [
+            name
+            for name, before, after in (
+                (args.results_md, old, results_md),
+                (
+                    args.summary,
+                    summary_path.read_text() if summary_path.exists() else "",
+                    summary_json,
+                ),
             )
-        )
+            if before != after
+        ]
+        if stale:
+            print("stale (re-run scripts/aggregate.py): " + ", ".join(stale), file=sys.stderr)
+            return 1
+        print("aggregate: docs/results.md (v0.1 part) and results/summary.json current")
+        return 0
+
+    summary_path.write_text(summary_json)
+    if not args.no_plots:
+        make_plots(rows, REPO / "docs" / "assets")
+    results_path.write_text(results_md)
     print(table)
     return 0
 
