@@ -19,6 +19,7 @@
     ],
     "crossval_ok": 97,
     "own_dense_ok": 97,
+    "crossval_vs_own_disagreements": 0,
     "at_start_failures": 0,
     "plan_time_s": {
       "n": 100,
@@ -92,11 +93,23 @@
       "p95": 0.0007819999999999999,
       "max": 0.00087
     },
+    "n_waypoints": {
+      "n": 100,
+      "median": 7.0,
+      "p95": 11.0,
+      "max": 12.0
+    },
     "plan_plus_simplify_s": {
       "n": 100,
       "median": 0.4020505,
       "p95": 1.0393500999999998,
       "max": 3.951221
+    },
+    "outside_planner_s": {
+      "n": 100,
+      "median": 0.0002805000000000446,
+      "p95": 0.00041075000000002633,
+      "max": 0.0008099999999999774
     },
     "simplify_dominates": 93
   },
@@ -120,6 +133,7 @@
     ],
     "crossval_ok": 91,
     "own_dense_ok": 91,
+    "crossval_vs_own_disagreements": 0,
     "at_start_failures": 0,
     "plan_time_s": {
       "n": 100,
@@ -193,11 +207,23 @@
       "p95": 0.0008214999999999999,
       "max": 0.3251
     },
+    "n_waypoints": {
+      "n": 100,
+      "median": 33.0,
+      "p95": 57.099999999999994,
+      "max": 71.0
+    },
     "plan_plus_simplify_s": {
       "n": 100,
       "median": 0.122837,
       "p95": 0.27409295,
       "max": 1.349461
+    },
+    "outside_planner_s": {
+      "n": 100,
+      "median": 0.04794799999999999,
+      "p95": 0.1953825,
+      "max": 0.29694299999999996
     }
   },
   "paired": {
