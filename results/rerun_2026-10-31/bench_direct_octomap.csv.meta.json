@@ -49,7 +49,7 @@
   "ompl_seed": 1,
   "planner_config": "RRTConnectRange2",
   "planning_time_s": 10.0,
-  "queries_file": "/tmp/verify/r2/results/queries_boxes.json",
+  "queries_file": "results/queries_boxes.json",
   "queries_run": 100,
   "query_seed": 0,
   "range_from_yaml": true,

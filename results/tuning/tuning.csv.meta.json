@@ -19,7 +19,7 @@
     "RRTConnectRange2"
   ],
   "planning_time_s": 10.0,
-  "queries_file": "/home/giri/work/r2/results/tuning/queries_seed1.json",
+  "queries_file": "results/tuning/queries_seed1.json",
   "queries_run": 20,
   "query_seed": 1,
   "repetitions": 1,

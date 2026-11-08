@@ -37,5 +37,7 @@ if [ ! -f "${PARTIAL}.meta.json" ]; then
 fi
 mv "${PARTIAL}" "${REPO}/${OUT}"
 mv "${PARTIAL}.meta.json" "${REPO}/${OUT}.meta.json"
+# Record the queries file relative to the repo, not as the absolute path the node was given.
+sed -i "s#\"queries_file\": \"${REPO}/#\"queries_file\": \"#" "${REPO}/${OUT}.meta.json"
 rows=$(($(wc -l <"${OUT}") - 1))
 echo "[bench_planners] ${rows} rows in ${OUT} (commit ${COMMIT}) in $(( $(date +%s) - start )) s"

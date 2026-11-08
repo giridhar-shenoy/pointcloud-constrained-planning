@@ -18,7 +18,7 @@
     "RRTConnectRange2"
   ],
   "planning_time_s": 10.0,
-  "queries_file": "/tmp/verify/r2/results/queries.json",
+  "queries_file": "results/queries.json",
   "queries_run": 100,
   "query_seed": 0,
   "repetitions": 1,
