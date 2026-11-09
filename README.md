@@ -96,6 +96,7 @@ colcon build && source install/setup.bash
 ```
 
 colcon is the ROS 2 build tool; this builds the six packages under `src/` in a few minutes.
+If a user-local Python (such as a uv-managed `python3.x` in `~/.local/bin`) comes before the system one on `PATH`, CMake picks it and the build fails on a missing `catkin_pkg`; add `--cmake-args -DPython3_EXECUTABLE=/usr/bin/python3`.
 
 ```bash
 scripts/bench_planners.sh 5 results/tmp/bench5.csv
